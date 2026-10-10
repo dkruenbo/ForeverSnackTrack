@@ -303,3 +303,18 @@ ForeverExpFoodLocales = {
 
 local locale = GetLocale and GetLocale() or "enUS"
 ForeverExpFoodL = ForeverExpFoodLocales[locale] or ForeverExpFoodLocales.enUS
+local restingOptions = {
+	enUS = "Remind while resting",
+	enGB = "Remind while resting",
+	deDE = "In Ruhebereichen erinnern",
+	esES = "Avisarme en zonas de descanso",
+	esMX = "Avisarme en zonas de descanso",
+	frFR = "Me rappeler dans les zones de repos",
+	itIT = "Avvisami nelle zone di riposo",
+	ptBR = "Avisar em áreas de descanso",
+	ruRU = "Напоминать в зонах отдыха",
+	koKR = "휴식 지역에서도 알림",
+	zhCN = "在休息区域提醒",
+	zhTW = "在休息區域提醒",
+}
+ForeverExpFoodL.restingOption = restingOptions[locale] or restingOptions.enUS

@@ -4,11 +4,12 @@ local defaults = {
 	chatAlerts = true,
 	screenAlerts = true,
 	remindWhenNoFood = false,
+	remindWhileResting = false,
 	repeatReminders = true,
-	reminderMinutes = 10,
+	reminderMinutes = 1,
 	snoozeMinutes = 1,
 	screenMessage = "",
-	screenDuration = 5,
+	screenDuration = 0,
 	screenScale = 1,
 	alertOffsetX = 0,
 	alertOffsetY = 120,
@@ -285,6 +286,13 @@ function ns.Scan()
 	if not ns.db then
 		return
 	end
+	if not ns.db.remindWhileResting and IsResting and IsResting() then
+		lastReminderTime = nil
+		if ns.HideScreenAlert then
+			ns.HideScreenAlert()
+		end
+		return
+	end
 	if UnitAffectingCombat and UnitAffectingCombat("player") then
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
@@ -554,6 +562,7 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
@@ -600,7 +609,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
 		end
-	elseif event == "PLAYER_REGEN_ENABLED" then
+	elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_UPDATE_RESTING" then
 		ns.Scan()
 	elseif event == "UNIT_AURA" then
 		if arg1 == "player" then

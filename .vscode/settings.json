@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python3 - <<'PY'\nfrom pathlib import Path\nimport zlib\nA='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\\(\\)';s=Path\\('ForeverExpFood-WeakAuras-Import-lektor\\.txt'\\)\\.read_text\\(\\)\\.strip\\(\\);b=bytearray\\(\\);v=n=0\nfor c in s\\[6:\\]:\n v\\|=A\\.index\\(c\\)<<n;n\\+=6\n while n>=8:b\\.append\\(v&255\\);v>>=8;n-=8\np=zlib\\.decompress\\(bytes\\(b\\),-15\\)\\.decode\\(\\)\nfor token in \\('\\^ScustomText\\^S','\\^ScustomTextUpdate\\^','\\^ScustomTextUpdateThrottle'\\):\n i=p\\.find\\(token\\);print\\(token,i,repr\\(p\\[i-30:i\\+100\\] if i>=0 else ''\\)\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

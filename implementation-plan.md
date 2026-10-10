@@ -43,6 +43,7 @@ Keep the initial implementation small; split files further only if the codebase 
    - Recheck when carried bags change, and register player-only aura updates where supported so aura events can reuse the cached bag result.
    - Retain a one-minute periodic scan as a fallback for missed or unavailable events.
    - Suppress reminders and hide visible screen alerts during combat; rescan immediately when combat ends.
+   - Suppress reminders while `IsResting()` is true unless `remindWhileResting` is enabled (default false); handle `PLAYER_UPDATE_RESTING` to hide alerts on entry and rescan on exit in both the addon and WeakAura.
    - Notify only when qualifying food is in bags and the active XP buff is absent or weaker than the best food bonus.
    - Track reminder state so repeated scans do not accidentally spam; apply the configured repeat behavior and interval.
 
@@ -75,6 +76,7 @@ Keep the initial implementation small; split files further only if the codebase 
 - The XP percentage is extracted dynamically; an equal or stronger kill-XP "Well fed" buff suppresses reminders, while unrelated buffs do not.
 - Checks run on login/reload, after bag changes, and at least once per minute.
 - No reminders are sent during combat; pending conditions are checked immediately after combat ends.
+- Resting areas suppress chat and screen reminders by default in both versions; the opt-in toggle overrides this, and leaving a resting area resumes eligible reminders without waiting for the repeat interval.
 - Reminders work immediately with defaults, options do not open automatically, and closing the options panel triggers a scan.
 - Chat and screen alerts can be toggled independently, and repeat behavior is configurable and persists across sessions.
 - Repeated scans do not cause reminders more frequently than the configured behavior allows.

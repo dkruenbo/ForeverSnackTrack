@@ -6,6 +6,7 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 
 - Scans the player's bags in the background once per minute.
 - Suppresses reminders during combat, hides a visible alert when combat begins, and checks again when combat ends.
+- Suppresses chat and screen reminders in resting areas by default, hides an existing alert on entry, and checks again on exit. An opt-in **Remind while resting** setting is available in the addon and WeakAura.
 - Detects qualifying food by its localized tooltip line describing increased experience from kills and extracts its integer percentage. Mithril Head Trout's current 5% effect is one example.
 - If a tooltip line has multiple percentages, selects the one most closely associated with its experience-increase wording.
 - Detects the percentage from the matching "Well fed" XP buff; a buff equal to or stronger than the best food bonus suppresses the reminder.
