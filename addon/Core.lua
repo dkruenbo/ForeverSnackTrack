@@ -143,6 +143,12 @@ local function tooltipExperienceBonusPercent(tooltipData)
 	if not tooltipData or type(tooltipData.lines) ~= "table" or #tooltipData.lines == 0 then
 		return nil
 	end
+	for _, line in ipairs(tooltipData.lines) do
+		local text = tooltipLineText(line)
+		if RETRIEVING_ITEM_INFO and text:find(RETRIEVING_ITEM_INFO, 1, true) then
+			return nil
+		end
+	end
 
 	for _, line in ipairs(tooltipData.lines) do
 		local text = normalizeTooltipText(tooltipLineText(line))
@@ -183,6 +189,18 @@ local function tooltipExperienceBonusPercent(tooltipData)
 	return false
 end
 
+local function foodItemType(itemID)
+	local getInfo = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+	if not getInfo then
+		return nil
+	end
+	local _, _, _, _, _, classID, subclassID = getInfo(itemID)
+	if classID == nil or subclassID == nil then
+		return nil
+	end
+	return classID == 0 and subclassID == 5
+end
+
 local function hasQualifyingFood()
 	if cachedBagResult ~= nil then
 		return cachedBagResult
@@ -200,13 +218,23 @@ local function hasQualifyingFood()
 			local itemInfo = C_Container.GetContainerItemInfo(bagID, slot)
 			local itemID = itemInfo and itemInfo.itemID
 			if itemID then
+				local isFood = foodItemType(itemID)
 				local bonusPercent = foodTooltipCache[itemID]
-				if bonusPercent == nil then
+				if isFood == nil then
+					unresolvedTooltip = true
+					bonusPercent = nil
+				elseif not isFood then
+					bonusPercent = false
+				elseif bonusPercent == nil then
 					local tooltipData = C_TooltipInfo and C_TooltipInfo.GetBagItem
 						and C_TooltipInfo.GetBagItem(bagID, slot)
-					if tooltipData and type(tooltipData.lines) == "table" and #tooltipData.lines > 0 then
+					if tooltipData and type(tooltipData.lines) == "table" and #tooltipData.lines > 1 then
 						bonusPercent = tooltipExperienceBonusPercent(tooltipData)
-						foodTooltipCache[itemID] = bonusPercent or false
+						if type(bonusPercent) == "number" then
+							foodTooltipCache[itemID] = bonusPercent
+						elseif bonusPercent == nil then
+							unresolvedTooltip = true
+						end
 					else
 						unresolvedTooltip = true
 					end
@@ -255,8 +283,13 @@ local function hasExperienceBuff()
 			local tooltipData = C_TooltipInfo.GetUnitBuff("player", index, "HELPFUL")
 			if tooltipData and type(tooltipData.lines) == "table" and #tooltipData.lines > 0 then
 				bonusPercent = tooltipExperienceBonusPercent(tooltipData)
-				if aura.spellId then
-					auraTooltipCache[aura.spellId] = bonusPercent or false
+				if #tooltipData.lines == 1 and aura.name and tooltipData.lines[1].leftText == aura.name then
+					bonusPercent = nil
+				end
+				if bonusPercent == nil then
+					unresolvedTooltip = true
+				elseif aura.spellId and type(bonusPercent) == "number" then
+					auraTooltipCache[aura.spellId] = bonusPercent
 				end
 			else
 				unresolvedTooltip = true
@@ -275,7 +308,8 @@ local function sendReminder(message, useCustomScreenMessage)
 		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack:|r " .. message)
 		sent = true
 	end
-	if ns.db.screenAlerts and ns.ShowScreenAlert then
+	if ns.db.screenAlerts and ns.ShowScreenAlert
+		and not (ns.alertFrame and ns.alertFrame.isPreview and ns.alertFrame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
 		sent = ns.ShowScreenAlert(screenMessage) or sent
 	end
@@ -287,7 +321,6 @@ function ns.Scan()
 		return
 	end
 	if not ns.db.remindWhileResting and IsResting and IsResting() then
-		lastReminderTime = nil
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
 		end
@@ -304,7 +337,7 @@ function ns.Scan()
 		reminderState = nil
 		dismissedReminderState = nil
 		if ns.HideScreenAlert then
-			ns.HideScreenAlert()
+			ns.HideScreenAlert(true)
 		end
 		return
 	end
@@ -334,7 +367,7 @@ function ns.Scan()
 			reminderState = nil
 			dismissedReminderState = nil
 			if ns.HideScreenAlert then
-				ns.HideScreenAlert()
+				ns.HideScreenAlert(true)
 			end
 			return
 		end
@@ -350,7 +383,7 @@ function ns.Scan()
 			reminderState = nil
 			dismissedReminderState = nil
 			if ns.HideScreenAlert then
-				ns.HideScreenAlert()
+				ns.HideScreenAlert(true)
 			end
 			return
 		end
@@ -361,7 +394,7 @@ function ns.Scan()
 		reminderState = nil
 		dismissedReminderState = nil
 		if ns.HideScreenAlert then
-			ns.HideScreenAlert()
+			ns.HideScreenAlert(true)
 		end
 		return
 	end
@@ -388,6 +421,18 @@ function ns.Scan()
 	if not lastReminderTime or (ns.db.repeatReminders and intervalElapsed) then
 		if sendReminder(message, useCustomScreenMessage) then
 			lastReminderTime = now
+		end
+	end
+	local frame = ns.alertFrame
+	local remaining = lastReminderTime and ns.db.screenDuration > 0
+		and lastReminderTime + ns.db.screenDuration - now
+	if ns.db.screenAlerts and lastReminderTime and ns.ShowScreenAlert
+		and (ns.db.screenDuration == 0 or remaining > 0)
+		and not (frame and frame:IsShown()) then
+		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
+		ns.ShowScreenAlert(screenMessage)
+		if remaining and ns.alertFrame then
+			ns.alertFrame.remaining = remaining
 		end
 	end
 end
@@ -456,15 +501,19 @@ function ns.DebugStatus()
 		for slot = 1, slotCount do
 			local itemInfo = C_Container.GetContainerItemInfo(bagID, slot)
 			local itemID = itemInfo and itemInfo.itemID
-			if itemID then
+			if itemID and foodItemType(itemID) ~= false then
 				scannedItems = scannedItems + 1
 				local tooltipData = C_TooltipInfo.GetBagItem(bagID, slot)
-				if not tooltipData or type(tooltipData.lines) ~= "table" or #tooltipData.lines == 0 then
+				if foodItemType(itemID) == nil or not tooltipData
+					or type(tooltipData.lines) ~= "table" or #tooltipData.lines <= 1 then
 					unresolvedItems = unresolvedItems + 1
 					debugPrint("Item " .. itemID .. ": tooltip data unavailable.")
 				else
 					local bonusPercent = tooltipExperienceBonusPercent(tooltipData)
-					foodTooltipCache[itemID] = bonusPercent or false
+					if bonusPercent == nil then
+						unresolvedItems = unresolvedItems + 1
+					end
+					foodTooltipCache[itemID] = type(bonusPercent) == "number" and bonusPercent or nil
 					local itemName = itemInfo.itemName or (GetItemInfo and GetItemInfo(itemID)) or ("item " .. itemID)
 					if type(bonusPercent) == "number" then
 						recognizedFoods = recognizedFoods + 1
@@ -514,8 +563,11 @@ function ns.DebugStatus()
 			debugPrint("Buff " .. (aura.name or tostring(aura.spellId)) .. ": tooltip data unavailable.")
 		else
 			local bonusPercent = tooltipExperienceBonusPercent(tooltipData)
+			if #tooltipData.lines == 1 and tooltipData.lines[1].leftText == aura.name then
+				bonusPercent = nil
+			end
 			if aura.spellId then
-				auraTooltipCache[aura.spellId] = bonusPercent or false
+				auraTooltipCache[aura.spellId] = type(bonusPercent) == "number" and bonusPercent or nil
 			end
 			if type(bonusPercent) == "number" then
 				recognizedBuffs = recognizedBuffs + 1
@@ -605,7 +657,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		invalidateBagScan()
 		ns.Scan()
 	elseif event == "PLAYER_REGEN_DISABLED" then
-		lastReminderTime = nil
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
 		end
@@ -613,6 +664,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		ns.Scan()
 	elseif event == "UNIT_AURA" then
 		if arg1 == "player" then
+			auraTooltipCache = {}
 			ns.Scan()
 		end
 	elseif event == "GET_ITEM_INFO_RECEIVED" then
