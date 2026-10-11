@@ -84,7 +84,7 @@ Run `sh weakaura/tests/run-weak-aura.sh` to decode the checked-in WeakAura impor
 
 - The repository root contains this shared README, license, and repository settings.
 - `addon/` contains the addon source, TOC, release ZIP, planning docs, and tests.
-- [Addon changelog](addon/Changelog.md) and [CurseForge description](addon/CURSEFORGE-DESCRIPTION.md) cover the addon only.
+- [Addon changelog](addon/docs/Changelog.md) and [CurseForge description](addon/docs/CURSEFORGE-DESCRIPTION.md) cover the addon only.
 - `weakaura/` contains the import, [WeakAura changelog](weakaura/WA-changelog.md), and its own tests.
 - [addon/ForeverSnackTrack.zip](addon/ForeverSnackTrack.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
 
@@ -95,9 +95,11 @@ addon/
 	ForeverSnackTrack.toc
 	Core.lua, Options.lua, ScreenAlert.lua, Locale.lua
 	ForeverSnackTrack.zip
-	Changelog.md
-	CURSEFORGE-DESCRIPTION.md
-	ROADMAP.md, spec.md, implementation-plan.md
+	implementation-plan.md
+	docs/
+		Changelog.md
+		CURSEFORGE-DESCRIPTION.md
+		ROADMAP.md, spec.md
 	tests/
 weakaura/
 	weak-aura-string.txt

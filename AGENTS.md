@@ -15,7 +15,7 @@ Forever SnackTrack reminds players to use the best kill-XP food in their bags wh
 - `addon/`: runtime Lua, TOC, ZIP, addon documentation, and regression tests.
 - `weakaura/`: the single current import, its changelog, and its regression tests.
 - Implementation-specific instructions are in [addon/README.md](addon/README.md) and [weakaura/README.md](weakaura/README.md).
-- Addon fixes belong in [addon/Changelog.md](addon/Changelog.md); do not mention WeakAura changes there.
+- Addon fixes belong in [addon/docs/Changelog.md](addon/docs/Changelog.md); do not mention WeakAura changes there.
 - WeakAura fixes belong in [weakaura/WA-changelog.md](weakaura/WA-changelog.md). Editing addon Lua does not update the encoded import, or vice versa.
 - Do not create multiple competing import strings or leave old release archives around without a reason.
 
@@ -99,4 +99,4 @@ Passing mocks does not certify Forever API availability, food classifications, l
 - Prefer explicit archive file lists over recursively zipping the workspace. Source files are authoritative; do not edit only the ZIP.
 - Preserve existing user edits and keep addon/WeakAura changes scoped. Do not commit, push, tag, rename repositories, or publish releases unless requested.
 - All requested commits and pushes must use a feature branch and a pull request targeting `main`. Never commit or push directly to `main`, bypass its protection, or merge a pull request without an explicit request.
-- Public descriptions should be short, plain, and factual, without sales fluff or claims of unverified client support. See [addon/CURSEFORGE-DESCRIPTION.md](addon/CURSEFORGE-DESCRIPTION.md).
+- Public descriptions should be short, plain, and factual, without sales fluff or claims of unverified client support. See [addon/docs/CURSEFORGE-DESCRIPTION.md](addon/docs/CURSEFORGE-DESCRIPTION.md).
