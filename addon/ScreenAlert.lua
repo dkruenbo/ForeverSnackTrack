@@ -1,13 +1,15 @@
 local addonName, ns = ...
 
 local function setAlertPosition(frame)
+	local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
 	frame:ClearAllPoints()
-	frame:SetPoint("CENTER", UIParent, "CENTER", ns.db.alertOffsetX, ns.db.alertOffsetY)
+	frame:SetPoint("CENTER", UIParent, "CENTER", ns.db.alertOffsetX / scale, ns.db.alertOffsetY / scale)
 end
 
 local function updateAlertAppearance(frame)
 	local color = ns.db.screenColor
 	frame:SetScale(ns.db.screenScale)
+	setAlertPosition(frame)
 	frame.text:SetTextColor(color.r, color.g, color.b)
 	frame:SetBackdropBorderColor(color.r, color.g, color.b, 0.9)
 end
@@ -58,8 +60,9 @@ local function createAlertFrame()
 		self:StopMovingOrSizing()
 		local x, y = self:GetCenter()
 		local centerX, centerY = UIParent:GetCenter()
-		ns.db.alertOffsetX = x - centerX
-		ns.db.alertOffsetY = y - centerY
+		local scale = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		ns.db.alertOffsetX = x * scale - centerX
+		ns.db.alertOffsetY = y * scale - centerY
 		setAlertPosition(self)
 	end)
 	frame:SetScript("OnUpdate", function(self, elapsed)
@@ -104,7 +107,7 @@ function ns.ShowScreenAlert(message, isPreview)
 		frame.dismissButton:Show()
 	end
 	updateAlertAppearance(frame)
-	frame.isPreview = isPreview
+	frame.isPreview = not not isPreview
 	frame.remaining = ns.db.screenDuration > 0 and ns.db.screenDuration or (isPreview and 5 or nil)
 	frame:Show()
 	return true
@@ -117,8 +120,11 @@ function ns.RefreshAlertButtons()
 	ns.alertFrame.snoozeButton:SetText(string.format(ForeverSnackTrackL.snoozeButton, ns.db.snoozeMinutes))
 end
 
-function ns.HideScreenAlert()
+function ns.HideScreenAlert(preservePreview)
 	if not ns.alertFrame then
+		return
+	end
+	if preservePreview and ns.alertFrame.isPreview then
 		return
 	end
 	ns.alertFrame.remaining = nil

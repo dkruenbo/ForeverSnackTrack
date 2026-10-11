@@ -8,6 +8,7 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 - Suppresses reminders during combat, hides a visible alert when combat begins, and checks again when combat ends.
 - Suppresses chat and screen reminders in resting areas by default, hides an existing alert on entry, and checks again on exit. An opt-in **Remind while resting** setting is available in the addon and WeakAura.
 - Detects qualifying food by its localized tooltip line describing increased experience from kills and extracts its integer percentage. Mithril Head Trout's current 5% effect is one example.
+- Requires food-and-drink item classification; unavailable classification, loading placeholders, and title-only food tooltips remain unresolved.
 - If a tooltip line has multiple percentages, selects the one most closely associated with its experience-increase wording.
 - Detects the percentage from the matching "Well fed" XP buff; a buff equal to or stronger than the best food bonus suppresses the reminder.
 - Starts reminders with default preferences without opening options or requiring setup; players can customize preferences in the in-game options panel, and closing it triggers a scan.
@@ -18,6 +19,8 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 - Lets players customize the screen alert text, display duration, text color, and size.
 - Offers 1-20 second screen-alert durations and an Unlimited choice at the rightmost slider position; unlimited alerts have no timeout, while previews remain timed.
 - Lets players preview and move the screen alert, with its position saved between sessions and a reset option.
+- Stores alert offsets in UIParent coordinates so dragging and changing scale do not move the saved screen position.
+- Tracks screen visibility separately from reminder delivery: eligible hidden alerts restore without resetting chat timing, active previews are preserved, and finite alerts retain their original expiry.
 - Provides a snooze button on screen alerts; snooze duration is configurable (1, 5, 10, 15, 30, or 60 minutes) and defaults to 1 minute.
 - Snoozing pauses both chat and screen reminders; alerts resume on the first scan after the selected duration if the condition remains.
 - Provides a dismiss button that suppresses the current reminder condition until it changes or resolves, without muting later conditions.

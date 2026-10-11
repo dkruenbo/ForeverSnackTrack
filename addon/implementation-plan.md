@@ -76,6 +76,9 @@ Keep the initial implementation small; split files further only if the codebase 
 - The XP percentage is extracted dynamically; an equal or stronger kill-XP "Well fed" buff suppresses reminders, while unrelated buffs do not.
 - Checks run on login/reload, after bag changes, and at least once per minute.
 - No reminders are sent during combat; pending conditions are checked immediately after combat ends.
+- Combat and resting transitions do not reset the chat-delivery timer. Hidden screen alerts restore independently, respecting finite expiry and active previews.
+- Food detection requires consumable food-and-drink classification; unresolved metadata and incomplete tooltips never establish a definitive no-food result.
+- Run `lua addon/tests/addon.lua` from the repository root for the reminder-state, classification, tooltip-retry, and scaled-position regression matrix.
 - Resting areas suppress chat and screen reminders by default in both versions; the opt-in toggle overrides this, and leaving a resting area resumes eligible reminders without waiting for the repeat interval.
 - Reminders work immediately with defaults, options do not open automatically, and closing the options panel triggers a scan.
 - Chat and screen alerts can be toggled independently, and repeat behavior is configurable and persists across sessions.
