@@ -1,5 +1,5 @@
 local addonName, ns = ...
-local L = ForeverExpFoodL
+local L = ForeverSnackTrackL
 
 local function makeCheckbox(parent, name, label, y)
 	local checkbox = CreateFrame("CheckButton", name, parent, "InterfaceOptionsCheckButtonTemplate")
@@ -41,13 +41,13 @@ function ns.InitializeOptions()
 		return
 	end
 
-	local panel = CreateFrame("Frame", "ForeverExpFoodOptionsPanel", UIParent)
-	panel.name = "ForeverExpFood"
+	local panel = CreateFrame("Frame", "ForeverSnackTrackOptionsPanel", UIParent)
+	panel.name = "Forever SnackTrack"
 	ns.optionsPanel = panel
 
 	local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", panel, "TOPLEFT", 24, -24)
-	title:SetText("ForeverExpFood")
+	title:SetText("Forever SnackTrack")
 
 	local description = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	description:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
@@ -55,11 +55,11 @@ function ns.InitializeOptions()
 	description:SetJustifyH("LEFT")
 	description:SetText(L.description)
 
-	panel.chatCheckbox = makeCheckbox(panel, "ForeverExpFoodChatCheckbox", L.chatOption, -105)
-	panel.screenCheckbox = makeCheckbox(panel, "ForeverExpFoodScreenCheckbox", L.screenOption, -135)
-	panel.repeatCheckbox = makeCheckbox(panel, "ForeverExpFoodRepeatCheckbox", L.repeatOption, -165)
-	panel.noFoodCheckbox = makeCheckbox(panel, "ForeverExpFoodNoFoodCheckbox", L.noFoodOption, -195)
-	panel.restingCheckbox = makeCheckbox(panel, "ForeverExpFoodRestingCheckbox", L.restingOption, -225)
+	panel.chatCheckbox = makeCheckbox(panel, "ForeverSnackTrackChatCheckbox", L.chatOption, -105)
+	panel.screenCheckbox = makeCheckbox(panel, "ForeverSnackTrackScreenCheckbox", L.screenOption, -135)
+	panel.repeatCheckbox = makeCheckbox(panel, "ForeverSnackTrackRepeatCheckbox", L.repeatOption, -165)
+	panel.noFoodCheckbox = makeCheckbox(panel, "ForeverSnackTrackNoFoodCheckbox", L.noFoodOption, -195)
+	panel.restingCheckbox = makeCheckbox(panel, "ForeverSnackTrackRestingCheckbox", L.restingOption, -225)
 
 	panel.chatCheckbox:SetScript("OnClick", function(self)
 		ns.db.chatAlerts = self:GetChecked()
@@ -90,7 +90,7 @@ function ns.InitializeOptions()
 	intervalLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -265)
 	intervalLabel:SetText(string.format(L.interval, ns.db.reminderMinutes))
 
-	panel.intervalSlider = CreateFrame("Slider", "ForeverExpFoodIntervalSlider", panel, "OptionsSliderTemplate")
+	panel.intervalSlider = CreateFrame("Slider", "ForeverSnackTrackIntervalSlider", panel, "OptionsSliderTemplate")
 	panel.intervalSlider:SetPoint("TOPLEFT", intervalLabel, "BOTTOMLEFT", 0, -12)
 	panel.intervalSlider:SetMinMaxValues(1, 60)
 	panel.intervalSlider:SetValueStep(1)
@@ -106,7 +106,7 @@ function ns.InitializeOptions()
 	snoozeLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -265)
 	snoozeLabel:SetText(L.snoozeOption)
 
-	panel.snoozeDropdown = CreateFrame("Frame", "ForeverExpFoodSnoozeDropdown", panel, "UIDropDownMenuTemplate")
+	panel.snoozeDropdown = CreateFrame("Frame", "ForeverSnackTrackSnoozeDropdown", panel, "UIDropDownMenuTemplate")
 	panel.snoozeDropdown:SetPoint("TOPLEFT", snoozeLabel, "BOTTOMLEFT", -16, -2)
 	UIDropDownMenu_SetWidth(panel.snoozeDropdown, 105)
 	UIDropDownMenu_Initialize(panel.snoozeDropdown, function(_, level)
@@ -133,7 +133,7 @@ function ns.InitializeOptions()
 	messageHint:SetPoint("TOPLEFT", messageLabel, "BOTTOMLEFT", 0, -4)
 	messageHint:SetText(L.screenMessageHint)
 
-	panel.messageBox = CreateFrame("EditBox", "ForeverExpFoodMessageEditBox", panel, "InputBoxTemplate")
+	panel.messageBox = CreateFrame("EditBox", "ForeverSnackTrackMessageEditBox", panel, "InputBoxTemplate")
 	panel.messageBox:SetSize(390, 24)
 	panel.messageBox:SetPoint("TOPLEFT", messageHint, "BOTTOMLEFT", 0, -8)
 	panel.messageBox:SetAutoFocus(false)
@@ -142,7 +142,7 @@ function ns.InitializeOptions()
 		ns.db.screenMessage = self:GetText()
 	end)
 
-	panel.previewButton = CreateFrame("Button", "ForeverExpFoodPreviewButton", panel, "UIPanelButtonTemplate")
+	panel.previewButton = CreateFrame("Button", "ForeverSnackTrackPreviewButton", panel, "UIPanelButtonTemplate")
 	panel.previewButton:SetSize(150, 24)
 	panel.previewButton:SetPoint("LEFT", panel.messageBox, "RIGHT", 14, 0)
 	panel.previewButton:SetText(L.previewMove)
@@ -157,7 +157,7 @@ function ns.InitializeOptions()
 	durationLabel:SetText(ns.db.screenDuration == 0 and L.screenDurationUnlimited
 		or string.format(L.screenDuration, ns.db.screenDuration))
 
-	panel.durationSlider = CreateFrame("Slider", "ForeverExpFoodDurationSlider", panel, "OptionsSliderTemplate")
+	panel.durationSlider = CreateFrame("Slider", "ForeverSnackTrackDurationSlider", panel, "OptionsSliderTemplate")
 	panel.durationSlider:SetPoint("TOPLEFT", durationLabel, "BOTTOMLEFT", 0, -12)
 	panel.durationSlider:SetMinMaxValues(1, 21)
 	panel.durationSlider:SetValueStep(1)
@@ -175,7 +175,7 @@ function ns.InitializeOptions()
 	scaleLabel:SetPoint("TOPLEFT", panel.durationSlider, "BOTTOMLEFT", 0, -24)
 	scaleLabel:SetText(string.format(L.screenScale, math.floor(ns.db.screenScale * 100 + 0.5)))
 
-	panel.scaleSlider = CreateFrame("Slider", "ForeverExpFoodScaleSlider", panel, "OptionsSliderTemplate")
+	panel.scaleSlider = CreateFrame("Slider", "ForeverSnackTrackScaleSlider", panel, "OptionsSliderTemplate")
 	panel.scaleSlider:SetPoint("TOPLEFT", scaleLabel, "BOTTOMLEFT", 0, -12)
 	panel.scaleSlider:SetMinMaxValues(75, 150)
 	panel.scaleSlider:SetValueStep(5)
@@ -191,7 +191,7 @@ function ns.InitializeOptions()
 	colorLabel:SetPoint("TOPLEFT", panel.scaleSlider, "BOTTOMLEFT", 0, -24)
 	colorLabel:SetText(L.screenColor)
 
-	panel.colorButton = CreateFrame("Button", "ForeverExpFoodColorButton", panel, "UIPanelButtonTemplate")
+	panel.colorButton = CreateFrame("Button", "ForeverSnackTrackColorButton", panel, "UIPanelButtonTemplate")
 	panel.colorButton:SetSize(110, 24)
 	panel.colorButton:SetPoint("LEFT", colorLabel, "RIGHT", 12, 0)
 	panel.colorButton:SetText(L.screenColor)
@@ -223,7 +223,7 @@ function ns.InitializeOptions()
 		})
 	end)
 
-	panel.resetPositionButton = CreateFrame("Button", "ForeverExpFoodResetPositionButton", panel, "UIPanelButtonTemplate")
+	panel.resetPositionButton = CreateFrame("Button", "ForeverSnackTrackResetPositionButton", panel, "UIPanelButtonTemplate")
 	panel.resetPositionButton:SetSize(145, 24)
 	panel.resetPositionButton:SetPoint("LEFT", panel.colorButton, "RIGHT", 12, 0)
 	panel.resetPositionButton:SetText(L.resetPosition)
@@ -239,16 +239,16 @@ function ns.InitializeOptions()
 		ns.Scan()
 	end)
 	if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-		ns.settingsCategory = Settings.RegisterCanvasLayoutCategory(panel, "ForeverExpFood")
+		ns.settingsCategory = Settings.RegisterCanvasLayoutCategory(panel, "Forever SnackTrack")
 		Settings.RegisterAddOnCategory(ns.settingsCategory)
 	elseif InterfaceOptions_AddCategory then
 		InterfaceOptions_AddCategory(panel)
 		ns.settingsCategoryID = panel.name
 	end
 
-	SLASH_FOREVEREXPFOOD1 = "/foreverexpfood"
-	SLASH_FOREVEREXPFOOD2 = "/fef"
-	SlashCmdList.FOREVEREXPFOOD = function(message)
+	SLASH_FOREVERSNACKTRACK1 = "/snacktrack"
+	SLASH_FOREVERSNACKTRACK2 = "/fst"
+	SlashCmdList.FOREVERSNACKTRACK = function(message)
 		local command = (message or ""):lower():match("^%s*(.-)%s*$")
 		if command == "debug" then
 			ns.DebugStatus()

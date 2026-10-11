@@ -1,9 +1,9 @@
 ## Interface: 16001
-## Title: ForeverExpFood
+## Title: Forever SnackTrack
 ## Notes: Reminds you when XP food is available and its buff is inactive.
-## Author: ForeverExpFood
+## Author: Forever SnackTrack
 ## Version: 0.1.0
-## SavedVariables: ForeverExpFoodDB
+## SavedVariables: ForeverSnackTrackDB, ForeverExpFoodDB
 
 Locale.lua
 ScreenAlert.lua

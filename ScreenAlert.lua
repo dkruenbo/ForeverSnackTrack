@@ -13,7 +13,7 @@ local function updateAlertAppearance(frame)
 end
 
 local function createAlertFrame()
-	local frame = CreateFrame("Frame", "ForeverExpFoodAlertFrame", UIParent, "BackdropTemplate")
+	local frame = CreateFrame("Frame", "ForeverSnackTrackAlertFrame", UIParent, "BackdropTemplate")
 	frame:SetSize(460, 128)
 	frame:SetFrameStrata("HIGH")
 	frame:SetClampedToScreen(true)
@@ -37,14 +37,14 @@ local function createAlertFrame()
 	frame.text:SetJustifyH("CENTER")
 	frame.text:SetWordWrap(true)
 
-	frame.snoozeButton = CreateFrame("Button", "ForeverExpFoodAlertSnoozeButton", frame, "UIPanelButtonTemplate")
+	frame.snoozeButton = CreateFrame("Button", "ForeverSnackTrackAlertSnoozeButton", frame, "UIPanelButtonTemplate")
 	frame.snoozeButton:SetSize(120, 24)
 	frame.snoozeButton:SetPoint("BOTTOM", frame, "BOTTOM", -68, 12)
 	frame.snoozeButton:SetScript("OnClick", function()
 		ns.SnoozeReminders()
 	end)
 
-	frame.dismissButton = CreateFrame("Button", "ForeverExpFoodAlertDismissButton", frame, "UIPanelButtonTemplate")
+	frame.dismissButton = CreateFrame("Button", "ForeverSnackTrackAlertDismissButton", frame, "UIPanelButtonTemplate")
 	frame.dismissButton:SetSize(100, 24)
 	frame.dismissButton:SetPoint("LEFT", frame.snoozeButton, "RIGHT", 8, 0)
 	frame.dismissButton:SetScript("OnClick", function()
@@ -91,15 +91,15 @@ function ns.ShowScreenAlert(message, isPreview)
 		displayMessage = ns.db.screenMessage
 	end
 	if displayMessage == "" then
-		displayMessage = string.format(ForeverExpFoodL.chatMessage, 5)
+		displayMessage = string.format(ForeverSnackTrackL.chatMessage, 5)
 	end
 	frame.text:SetText(displayMessage)
 	if isPreview then
 		frame.snoozeButton:Hide()
 		frame.dismissButton:Hide()
 	else
-		frame.snoozeButton:SetText(string.format(ForeverExpFoodL.snoozeButton, ns.db.snoozeMinutes))
-		frame.dismissButton:SetText(ForeverExpFoodL.dismissButton)
+		frame.snoozeButton:SetText(string.format(ForeverSnackTrackL.snoozeButton, ns.db.snoozeMinutes))
+		frame.dismissButton:SetText(ForeverSnackTrackL.dismissButton)
 		frame.snoozeButton:Show()
 		frame.dismissButton:Show()
 	end
@@ -114,7 +114,7 @@ function ns.RefreshAlertButtons()
 	if not ns.alertFrame or not ns.db then
 		return
 	end
-	ns.alertFrame.snoozeButton:SetText(string.format(ForeverExpFoodL.snoozeButton, ns.db.snoozeMinutes))
+	ns.alertFrame.snoozeButton:SetText(string.format(ForeverSnackTrackL.snoozeButton, ns.db.snoozeMinutes))
 end
 
 function ns.HideScreenAlert()

@@ -1,4 +1,4 @@
-ForeverExpFoodLocales = {
+ForeverSnackTrackLocales = {
 	enUS = {
 		chatMessage = "XP food is in your bags, but its %d%% kill experience buff is not active.",
 		noFoodMessage = "No XP food is in your bags. Pick some up to get a kill-XP bonus.",
@@ -53,7 +53,7 @@ ForeverExpFoodLocales = {
 		chatMessage = "XP-Essen ist in deinen Taschen, aber der %d%%-Erfahrungsbonus durch getötete Gegner ist nicht aktiv.",
 		noFoodMessage = "Du hast kein XP-Essen in deinen Taschen. Besorge dir welches für zusätzliche Erfahrung durch getötete Gegner.",
 		chatOption = "Chatnachricht",
-		description = "Lege fest, wie ForeverExpFood dich erinnert, wenn XP-Essen verfügbar und der zugehörige Stärkungseffekt nicht aktiv ist.",
+		description = "Lege fest, wie Forever SnackTrack dich erinnert, wenn XP-Essen verfügbar und der zugehörige Stärkungseffekt nicht aktiv ist.",
 		interval = "Wiederholungsintervall: %d Minuten",
 		screenOption = "Bildschirmmeldung",
 		screenMessageLabel = "Eigener Bildschirmtext",
@@ -302,7 +302,7 @@ ForeverExpFoodLocales = {
 }
 
 local locale = GetLocale and GetLocale() or "enUS"
-ForeverExpFoodL = ForeverExpFoodLocales[locale] or ForeverExpFoodLocales.enUS
+ForeverSnackTrackL = ForeverSnackTrackLocales[locale] or ForeverSnackTrackLocales.enUS
 local restingOptions = {
 	enUS = "Remind while resting",
 	enGB = "Remind while resting",
@@ -317,4 +317,4 @@ local restingOptions = {
 	zhCN = "在休息区域提醒",
 	zhTW = "在休息區域提醒",
 }
-ForeverExpFoodL.restingOption = restingOptions[locale] or restingOptions.enUS
+ForeverSnackTrackL.restingOption = restingOptions[locale] or restingOptions.enUS

@@ -6,7 +6,7 @@ Build a lightweight World of Warcraft Forever addon for the beta client, using t
 
 ## Proposed Addon Structure
 
-- `ForeverExpFood.toc`: addon metadata, interface version `16001`, saved-variable declaration, and Lua file load order.
+- `ForeverSnackTrack.toc`: addon metadata, interface version `16001`, saved-variable declaration, and Lua file load order.
 - `Core.lua`: event registration, scan scheduling, inventory and aura checks, and reminder coordination.
 - `Options.lua`: in-game settings panel and saved preferences, with a scan when the panel closes.
 - `ScreenAlert.lua`: movable screen-alert frame with timed or unlimited duration and saved appearance and position.
@@ -55,14 +55,14 @@ Keep the initial implementation small; split files further only if the codebase 
    - Allow players to customize screen-alert text, duration, color, and size, preview it, move it, and reset its position.
    - Preserve 1-20 second durations and offer Unlimited at the rightmost slider position, stored as zero; previews must still time out.
    - Add a configurable snooze duration (1, 5, 10, 15, 30, or 60 minutes; default 1 minute) and a dismiss action scoped to the current reminder condition.
-   - Add `/fef debug` output for recognized food/buff percentages and relevant tooltip candidate lines; keep `/fef` as the options shortcut.
+   - Add `/fst debug` output for recognized food/buff percentages and relevant tooltip candidate lines; keep `/fst` as the options shortcut.
    - Persist settings between sessions and validate values loaded from saved variables.
 
 7. **Verify behavior in the beta client**
    - Confirm the addon loads without Lua errors and settings survive reloads.
    - Test qualifying food present/absent, matching buff active/inactive, and unrelated food or buffs.
    - Verify 5%, 10%, and 15% XP bonuses are extracted, while unrelated percentages are rejected and the XP value wins over a nearby non-XP percentage.
-   - Use `/fef debug` in the English client to inspect detected food/buff percentages and candidate tooltip lines.
+   - Use `/fst debug` in the English client to inspect detected food/buff percentages and candidate tooltip lines.
    - Exercise localized matching with simulated locale strings; do not require switching the game client language.
    - Review translated tooltip phrases against reliable localized game-data references where available, and document any unverified wording.
    - Test login/reload, bag changes, and the one-minute fallback.

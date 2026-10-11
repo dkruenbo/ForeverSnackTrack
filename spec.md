@@ -11,7 +11,7 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 - If a tooltip line has multiple percentages, selects the one most closely associated with its experience-increase wording.
 - Detects the percentage from the matching "Well fed" XP buff; a buff equal to or stronger than the best food bonus suppresses the reminder.
 - Starts reminders with default preferences without opening options or requiring setup; players can customize preferences in the in-game options panel, and closing it triggers a scan.
-- Provides `/fef debug` to report recognized XP food, active XP buffs, and relevant tooltip candidate lines.
+- Provides `/fst debug` to report recognized XP food, active XP buffs, and relevant tooltip candidate lines.
 - Supports chat and screen alerts, each independently toggleable.
 - Lets players customize whether and how often reminders repeat.
 - Offers an opt-in reminder when no qualifying XP food is in the player's bags and the XP buff is inactive; this option is off by default.
@@ -25,9 +25,9 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 ## Usage
 
 - Install the addon in the World of Warcraft Forever addons folder and enable it in-game.
-- Use default reminder preferences or adjust them in the options panel with `/fef`.
+- Use default reminder preferences or adjust them in the options panel with `/fst`.
 - Optionally enable reminders to restock XP food when none is available in bags.
 - Use the options panel to customize, preview, and reposition the screen alert.
-- Run `/fef debug` to inspect food and buff detection during testing.
+- Run `/fst debug` to inspect food and buff detection during testing.
 - Snooze a reminder temporarily or dismiss the current reminder condition from the screen alert.
 - The addon automatically checks bags once per minute and reminds the player when qualifying food is available and the active XP buff is weaker than the best available food bonus.

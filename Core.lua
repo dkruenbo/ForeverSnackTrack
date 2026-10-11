@@ -58,9 +58,9 @@ local function containsAny(text, terms)
 end
 
 local function hasExperienceKillContext(text)
-	return containsAny(text, ForeverExpFoodL.experienceTerms)
-		and containsAny(text, ForeverExpFoodL.killTerms)
-		and containsAny(text, ForeverExpFoodL.increaseTerms)
+	return containsAny(text, ForeverSnackTrackL.experienceTerms)
+		and containsAny(text, ForeverSnackTrackL.killTerms)
+		and containsAny(text, ForeverSnackTrackL.increaseTerms)
 end
 
 local function distanceToTerms(text, terms, percentStart, percentEnd)
@@ -94,49 +94,49 @@ end
 
 local function debugPrint(message)
 	if DEFAULT_CHAT_FRAME then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForeverExpFood debug:|r " .. message)
+		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack debug:|r " .. message)
 	end
 end
 
 local function initializeSettings()
-	if type(ForeverExpFoodDB) ~= "table" then
-		ForeverExpFoodDB = {}
+	if type(ForeverSnackTrackDB) ~= "table" then
+		ForeverSnackTrackDB = type(ForeverExpFoodDB) == "table" and ForeverExpFoodDB or {}
 	end
 
 	for key, value in pairs(defaults) do
-		if type(ForeverExpFoodDB[key]) ~= type(value) then
-			ForeverExpFoodDB[key] = value
+		if type(ForeverSnackTrackDB[key]) ~= type(value) then
+			ForeverSnackTrackDB[key] = value
 		end
 	end
 
-	ForeverExpFoodDB.reminderMinutes = math.max(1, math.min(60, math.floor(ForeverExpFoodDB.reminderMinutes)))
+	ForeverSnackTrackDB.reminderMinutes = math.max(1, math.min(60, math.floor(ForeverSnackTrackDB.reminderMinutes)))
 	local validSnoozeDuration = false
 	for _, minutes in ipairs(snoozeDurations) do
-		if ForeverExpFoodDB.snoozeMinutes == minutes then
+		if ForeverSnackTrackDB.snoozeMinutes == minutes then
 			validSnoozeDuration = true
 			break
 		end
 	end
 	if not validSnoozeDuration then
-		ForeverExpFoodDB.snoozeMinutes = defaults.snoozeMinutes
+		ForeverSnackTrackDB.snoozeMinutes = defaults.snoozeMinutes
 	end
-	if ForeverExpFoodDB.screenDuration ~= 0 then
-		ForeverExpFoodDB.screenDuration = math.max(1, math.min(20, math.floor(ForeverExpFoodDB.screenDuration)))
+	if ForeverSnackTrackDB.screenDuration ~= 0 then
+		ForeverSnackTrackDB.screenDuration = math.max(1, math.min(20, math.floor(ForeverSnackTrackDB.screenDuration)))
 	end
-	ForeverExpFoodDB.screenScale = math.max(0.75, math.min(1.5, ForeverExpFoodDB.screenScale))
-	if type(ForeverExpFoodDB.screenColor) ~= "table" then
-		ForeverExpFoodDB.screenColor = { r = 1, g = 0.82, b = 0 }
+	ForeverSnackTrackDB.screenScale = math.max(0.75, math.min(1.5, ForeverSnackTrackDB.screenScale))
+	if type(ForeverSnackTrackDB.screenColor) ~= "table" then
+		ForeverSnackTrackDB.screenColor = { r = 1, g = 0.82, b = 0 }
 	else
 		for _, channel in ipairs({ "r", "g", "b" }) do
-			local value = ForeverExpFoodDB.screenColor[channel]
+			local value = ForeverSnackTrackDB.screenColor[channel]
 			if type(value) ~= "number" or value ~= value then
-				ForeverExpFoodDB.screenColor[channel] = channel == "r" and 1 or channel == "g" and 0.82 or 0
+				ForeverSnackTrackDB.screenColor[channel] = channel == "r" and 1 or channel == "g" and 0.82 or 0
 			else
-				ForeverExpFoodDB.screenColor[channel] = math.max(0, math.min(1, value))
+				ForeverSnackTrackDB.screenColor[channel] = math.max(0, math.min(1, value))
 			end
 		end
 	end
-	ns.db = ForeverExpFoodDB
+	ns.db = ForeverSnackTrackDB
 end
 
 local function tooltipExperienceBonusPercent(tooltipData)
@@ -161,10 +161,10 @@ local function tooltipExperienceBonusPercent(tooltipData)
 					local value = tonumber(percentage)
 					if value and value > 0 then
 						local experienceDistance = distanceToTerms(
-							text, ForeverExpFoodL.experienceTerms, matchStart, matchEnd
+							text, ForeverSnackTrackL.experienceTerms, matchStart, matchEnd
 						)
 						local increaseDistance = distanceToTerms(
-							text, ForeverExpFoodL.increaseTerms, matchStart, matchEnd
+							text, ForeverSnackTrackL.increaseTerms, matchStart, matchEnd
 						)
 						local distance = experienceDistance + increaseDistance * 2
 						if distance < closestDistance then
@@ -272,7 +272,7 @@ end
 local function sendReminder(message, useCustomScreenMessage)
 	local sent = false
 	if ns.db.chatAlerts and DEFAULT_CHAT_FRAME then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForeverExpFood:|r " .. message)
+		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack:|r " .. message)
 		sent = true
 	end
 	if ns.db.screenAlerts and ns.ShowScreenAlert then
@@ -339,7 +339,7 @@ function ns.Scan()
 			return
 		end
 		state = "missing-buff:" .. hasFood
-		message = string.format(ForeverExpFoodL.chatMessage, hasFood)
+		message = string.format(ForeverSnackTrackL.chatMessage, hasFood)
 		useCustomScreenMessage = true
 	elseif ns.db.remindWhenNoFood then
 		local hasBuff = hasExperienceBuff()
@@ -355,7 +355,7 @@ function ns.Scan()
 			return
 		end
 		state = "missing-food"
-		message = ForeverExpFoodL.noFoodMessage
+		message = ForeverSnackTrackL.noFoodMessage
 	else
 		lastReminderTime = nil
 		reminderState = nil
@@ -398,8 +398,8 @@ local function debugTooltipCandidates(tooltipData)
 		local rawText = tooltipLineText(line)
 		local text = normalizeTooltipText(rawText)
 		if rawText:find("%", 1, true)
-			or containsAny(text, ForeverExpFoodL.experienceTerms)
-			or containsAny(text, ForeverExpFoodL.killTerms) then
+			or containsAny(text, ForeverSnackTrackL.experienceTerms)
+			or containsAny(text, ForeverSnackTrackL.killTerms) then
 			table.insert(candidates, rawText)
 		end
 	end

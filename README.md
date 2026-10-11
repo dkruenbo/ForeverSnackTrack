@@ -1,4 +1,4 @@
-# ForeverExpFood
+# Forever SnackTrack
 
 A lightweight World of Warcraft Forever addon that helps you maintain the kill-experience bonus from qualifying food. It reads the percentage from the tooltip; 5% is the current example, not a hard-coded limit.
 
@@ -18,20 +18,26 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download `ForeverExpFood.zip` from the repository and extract its `ForeverExpFood` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
-2. Enable **ForeverExpFood** in the AddOns list and log in.
-3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/foreverexpfood` or `/fef`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, or no longer needed. Choose a finite alert duration in the options if preferred.
-4. Run `/fef debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
+1. Download `ForeverSnackTrack.zip` from the repository and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+2. Enable **Forever SnackTrack** in the AddOns list and log in.
+3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, or no longer needed. Choose a finite alert duration in the options if preferred.
+4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
 
 The addon targets interface `16001`. The game client must provide the Retail APIs used by the addon.
 
+## Upgrading From ForeverExpFood
+
+Exit the game before upgrading. To keep existing preferences, copy `ForeverExpFood.lua` to `ForeverSnackTrack.lua` in each account's `WTF/Account/<account>/SavedVariables/` folder. The renamed addon imports the old settings when no new settings exist. Keep a backup of the original file.
+
+Remove the old `Interface/AddOns/ForeverExpFood` folder after installing `ForeverSnackTrack` so both versions do not run together. The new options commands are `/snacktrack` and `/fst`.
+
 ## Troubleshooting
 
-If XP food is in your bags but no reminder appears, open `/fef` and check that at least one alert is enabled. Reminders are suppressed during combat, in resting areas by default, while snoozed, or after dismissing the current reminder condition.
+If XP food is in your bags but no reminder appears, open `/fst` and check that at least one alert is enabled. Reminders are suppressed during combat, in resting areas by default, while snoozed, or after dismissing the current reminder condition.
 
 The [WeakAura import](weak-aura-string.txt) also has a **Remind while resting** toggle in Custom Options, disabled by default. Re-import it to receive this option.
 
-Run `/fef debug` out of combat to inspect reminder settings, recognized food and buffs, and unavailable tooltip data. If your food is not recognized, include the debug output, food name, full tooltip text, and game language in a bug report.
+Run `/fst debug` out of combat to inspect reminder settings, recognized food and buffs, and unavailable tooltip data. If your food is not recognized, include the debug output, food name, full tooltip text, and game language in a bug report.
 
 ## License
 
