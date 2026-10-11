@@ -52,8 +52,8 @@ From inside `addon/`, run `lua tests/addon.lua` instead.
 
 ## Documentation
 
-- [Changelog](Changelog.md)
-- [CurseForge description](CURSEFORGE-DESCRIPTION.md)
-- [Specification](spec.md)
+- [Changelog](docs/Changelog.md)
+- [CurseForge description](docs/CURSEFORGE-DESCRIPTION.md)
+- [Specification](docs/spec.md)
 - [Implementation plan](implementation-plan.md)
-- [Roadmap](ROADMAP.md)
+- [Roadmap](docs/ROADMAP.md)
