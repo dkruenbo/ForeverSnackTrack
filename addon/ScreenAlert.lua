@@ -14,6 +14,24 @@ local function updateAlertAppearance(frame)
 	frame:SetBackdropBorderColor(color.r, color.g, color.b, 0.9)
 end
 
+local function setEatFood(frame, itemID)
+	if InCombatLockdown and InCombatLockdown() then
+		return false
+	end
+	for _, food in ipairs(ns.GetAvailableFoods and ns.GetAvailableFoods() or {}) do
+		if food.itemID == itemID then
+			local macroText = "/use " .. food.itemName
+			frame.eatButton:SetAttribute("type", "macro")
+			frame.eatButton:SetAttribute("macrotext", macroText)
+			frame.eatButton:SetAttribute("type1", "macro")
+			frame.eatButton:SetAttribute("macrotext1", macroText)
+			frame.selectedFoodID = food.itemID
+			return true
+		end
+	end
+	return false
+end
+
 local function createAlertFrame()
 	local frame = CreateFrame("Frame", "ForeverSnackTrackAlertFrame", UIParent, "BackdropTemplate")
 	frame:SetSize(460, 128)
@@ -41,7 +59,7 @@ local function createAlertFrame()
 
 	frame.snoozeButton = CreateFrame("Button", "ForeverSnackTrackAlertSnoozeButton", frame, "UIPanelButtonTemplate")
 	frame.snoozeButton:SetSize(120, 24)
-	frame.snoozeButton:SetPoint("BOTTOM", frame, "BOTTOM", -68, 12)
+	frame.snoozeButton:SetPoint("BOTTOM", frame, "BOTTOM", 4, 12)
 	frame.snoozeButton:SetScript("OnClick", function()
 		ns.SnoozeReminders()
 	end)
@@ -51,6 +69,46 @@ local function createAlertFrame()
 	frame.dismissButton:SetPoint("LEFT", frame.snoozeButton, "RIGHT", 8, 0)
 	frame.dismissButton:SetScript("OnClick", function()
 		ns.DismissReminder()
+	end)
+
+	frame.eatButton = CreateFrame("Button", "ForeverSnackTrackAlertEatButton", frame,
+		"UIPanelButtonTemplate,InsecureActionButtonTemplate")
+	frame.eatButton:SetSize(96, 24)
+	frame.eatButton:SetPoint("RIGHT", frame.snoozeButton, "LEFT", -36, 0)
+	frame.eatButton:SetText(ForeverSnackTrackL.eatButton or ForeverSnackTrackLocales.enUS.eatButton)
+	frame.eatButton:EnableMouse(true)
+	frame.eatButton:RegisterForClicks("LeftButtonUp")
+	frame.eatButton:SetAttribute("useOnKeyDown", false)
+
+	frame.eatDropdownButton = CreateFrame("Button", "ForeverSnackTrackAlertEatDropdownButton", frame, "UIPanelButtonTemplate")
+	frame.eatDropdownButton:SetSize(24, 24)
+	frame.eatDropdownButton:SetPoint("RIGHT", frame.snoozeButton, "LEFT", -8, 0)
+	frame.eatDropdownButton:SetText("v")
+	frame.eatDropdownButton:SetScript("OnClick", function()
+		if ToggleDropDownMenu then
+			ToggleDropDownMenu(1, nil, frame.foodDropdown, "ForeverSnackTrackAlertEatDropdownButton", 0, 0)
+		end
+	end)
+
+	frame.foodDropdown = CreateFrame("Frame", "ForeverSnackTrackAlertFoodDropdown", frame, "UIDropDownMenuTemplate")
+	UIDropDownMenu_Initialize(frame.foodDropdown, function(_, level)
+		if level ~= 1 then
+			return
+		end
+		local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
+		for _, item in ipairs(foods) do
+			local food = item
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = string.format("%s (%d%%)", food.itemName, food.bonusPercent)
+			if food.count > 1 then
+				info.text = info.text .. string.format(" x%d", food.count)
+			end
+			info.checked = frame.selectedFoodID == food.itemID
+			info.func = function()
+				setEatFood(frame, food.itemID)
+			end
+			UIDropDownMenu_AddButton(info, level)
+		end
 	end)
 
 	frame:SetScript("OnDragStart", function(self)
@@ -100,11 +158,24 @@ function ns.ShowScreenAlert(message, isPreview)
 	if isPreview then
 		frame.snoozeButton:Hide()
 		frame.dismissButton:Hide()
+		frame.eatButton:Hide()
+		frame.eatDropdownButton:Hide()
 	else
 		frame.snoozeButton:SetText(string.format(ForeverSnackTrackL.snoozeButton, ns.db.snoozeMinutes))
 		frame.dismissButton:SetText(ForeverSnackTrackL.dismissButton)
 		frame.snoozeButton:Show()
 		frame.dismissButton:Show()
+		local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
+		if #foods > 0 then
+			if not frame.selectedFoodID or not setEatFood(frame, frame.selectedFoodID) then
+				setEatFood(frame, foods[1].itemID)
+			end
+			frame.eatButton:Show()
+			frame.eatDropdownButton:Show()
+		else
+			frame.eatButton:Hide()
+			frame.eatDropdownButton:Hide()
+		end
 	end
 	updateAlertAppearance(frame)
 	frame.isPreview = not not isPreview

@@ -1,7 +1,20 @@
 local addonPath = (arg[0]:match("^(.*[/\\])") or "") .. "../"
 
 local function setup(settings)
-	local state = { now = 100, chats = 0, food = "Increases experience from kills by 5%", classID = 0, subclassID = 5 }
+	local state = {
+		now = 100,
+		chats = 0,
+		food = "Increases experience from kills by 5%",
+		classID = 0,
+		subclassID = 5,
+		items = { { bagID = 0, slot = 1, itemID = 1, stackCount = 1 } },
+		itemTypes = {},
+		itemNames = {},
+		foodsByItem = {},
+		usedItems = {},
+		menuEntries = {},
+		dropdownAnchor = nil,
+	}
 	local methods = {}
 	local function object()
 		return setmetatable({ scripts = {}, shown = false }, { __index = function(_, key)
@@ -9,6 +22,7 @@ local function setup(settings)
 		end })
 	end
 	function methods:SetScript(event, callback) self.scripts[event] = callback end
+	function methods:SetSize(width, height) self.size = { width, height } end
 	function methods:CreateFontString() return object() end
 	function methods:CreateTexture() return object() end
 	function methods:SetText(text) self.textValue = text end
@@ -22,11 +36,25 @@ local function setup(settings)
 	function methods:Hide() self.shown = false end
 	function methods:IsShown() return self.shown end
 	function methods:SetScale(scale) self.scale = scale end
+	function methods:SetFrameLevel(level) self.frameLevel = level end
+	function methods:GetFrameLevel() return rawget(self, "frameLevel") or 0 end
 	function methods:GetEffectiveScale() return rawget(self, "scale") or 1 end
 	function methods:GetCenter() return rawget(self, "centerX") or 0, rawget(self, "centerY") or 0 end
 	function methods:SetPoint(...) self.point = { ... } end
-	function CreateFrame(_, name)
+	function methods:EnableMouse(enabled) self.mouseEnabled = enabled end
+	function methods:RegisterForClicks(...) self.registeredClicks = { ... } end
+	function methods:SetAttribute(key, value)
+		local attributes = rawget(self, "attributes") or {}
+		rawset(self, "attributes", attributes)
+		attributes[key] = value
+	end
+	function methods:GetAttribute(key)
+		local attributes = rawget(self, "attributes")
+		return attributes and attributes[key]
+	end
+	function CreateFrame(_, name, parent, template)
 		local frame = object()
+		frame.template = template
 		if name then _G[name .. "Text"] = object() else state.eventFrame = frame end
 		return frame
 	end
@@ -34,23 +62,65 @@ local function setup(settings)
 	SlashCmdList = {}
 	UIDropDownMenu_SetSelectedValue = function() end
 	UIDropDownMenu_SetWidth = function() end
-	UIDropDownMenu_Initialize = function() end
+	UIDropDownMenu_Initialize = function(dropdown, initialize) dropdown.initialize = initialize end
+	UIDropDownMenu_CreateInfo = function() return {} end
+	UIDropDownMenu_AddButton = function(info) table.insert(state.menuEntries, info) end
+	ToggleDropDownMenu = function(_, _, dropdown, anchorName)
+		state.dropdownAnchor = anchorName
+		state.menuEntries = {}
+		dropdown.initialize(dropdown, 1)
+	end
 	Settings, InterfaceOptions_AddCategory = nil, nil
 	function GetTime() return state.now end
 	function GetLocale() return "enUS" end
 	function IsResting() return state.resting end
 	function UnitAffectingCombat() return state.combat end
+	function GetItemInfo(itemID) return state.itemNames[itemID] end
 	NUM_BAG_SLOTS = 0
 	RETRIEVING_ITEM_INFO = "Retrieving item information"
-	C_Item = { GetItemInfoInstant = function() return 1, nil, nil, nil, nil, state.classID, state.subclassID end }
+	C_Item = { GetItemInfoInstant = function(itemID)
+		local itemType = state.itemTypes[itemID]
+		return itemID, nil, nil, nil, nil,
+			itemType and itemType[1] or state.classID,
+			itemType and itemType[2] or state.subclassID
+	end }
 	C_Container = {
-		GetContainerNumSlots = function() return state.empty and 0 or 1 end,
-		GetContainerItemInfo = function() return { itemID = 1 } end,
+		GetContainerNumSlots = function(bagID)
+			if state.empty then return 0 end
+			local slotCount = 0
+			for _, item in ipairs(state.items) do
+				if item.bagID == bagID then slotCount = math.max(slotCount, item.slot) end
+			end
+			return slotCount
+		end,
+		GetContainerItemInfo = function(bagID, slot)
+			for _, item in ipairs(state.items) do
+				if item.bagID == bagID and item.slot == slot then
+					return {
+						itemID = item.itemID,
+						itemName = state.itemNames[item.itemID],
+						stackCount = item.stackCount,
+					}
+				end
+			end
+		end,
+		UseContainerItem = function(bagID, slot)
+			for _, item in ipairs(state.items) do
+				if item.bagID == bagID and item.slot == slot then
+					table.insert(state.usedItems, { bagID = bagID, slot = slot, itemID = item.itemID })
+					return
+				end
+			end
+		end,
 	}
 	C_TooltipInfo = {
-		GetBagItem = function()
+		GetBagItem = function(bagID, slot)
 			if state.partial then return { lines = { { leftText = "Food" } } } end
-			return { lines = { { leftText = "Food" }, { leftText = state.food } } }
+			local itemID = 1
+			for _, item in ipairs(state.items) do
+				if item.bagID == bagID and item.slot == slot then itemID = item.itemID end
+			end
+			return { lines = { { leftText = "Food" }, { leftText = state.foodsByItem[itemID] or state.food } } }
 		end,
 		GetUnitBuff = function() return { lines = { { leftText = state.buff } } } end,
 	}
@@ -83,6 +153,7 @@ for _, repeatReminders in ipairs({ false, true }) do
 	ns.optionsPanel.previewButton.scripts.OnClick()
 	ns.Scan()
 	assert(ns.alertFrame.isPreview and ns.alertFrame:IsShown())
+	assert(not ns.alertFrame.eatButton:IsShown() and not ns.alertFrame.eatDropdownButton:IsShown())
 	ns.optionsPanel.scripts.OnHide()
 	assert(ns.alertFrame:IsShown() and not ns.alertFrame.isPreview and state.chats == 1)
 	state.combat = true
@@ -109,8 +180,50 @@ for _, repeatReminders in ipairs({ false, true }) do
 	assert(not ns.alertFrame:IsShown())
 end
 
+local eatNs, eatState = setup()
+eatState.items = {
+	{ bagID = 0, slot = 1, itemID = 1, stackCount = 2 },
+	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
+	{ bagID = 0, slot = 3, itemID = 3, stackCount = 1 },
+}
+eatState.itemNames = { [1] = "Roasted Fish", [2] = "Spiced Meat", [3] = "XP Trinket" }
+eatState.foodsByItem = {
+	[1] = "Increases experience from kills by 5%",
+	[2] = "Increases experience from kills by 10%",
+	[3] = "Increases experience from kills by 50%",
+}
+eatState.itemTypes[3] = { 4, 1 }
+eatNs.Scan()
+assert(eatNs.alertFrame.eatButton:IsShown() and eatNs.alertFrame.eatDropdownButton:IsShown())
+assert(eatNs.alertFrame.eatButton.template == "UIPanelButtonTemplate,InsecureActionButtonTemplate")
+assert(eatNs.alertFrame.eatButton.size[1] == 96 and eatNs.alertFrame.eatButton.size[2] == 24)
+assert(eatNs.alertFrame.eatButton.mouseEnabled == true)
+assert(eatNs.alertFrame.eatButton.registeredClicks[1] == "LeftButtonUp")
+assert(eatNs.alertFrame.eatButton:GetAttribute("useOnKeyDown") == false)
+assert(eatNs.alertFrame.eatButton:GetAttribute("type1") == "macro")
+assert(eatNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Spiced Meat")
+assert(#eatState.usedItems == 0)
+eatNs.alertFrame.eatDropdownButton.scripts.OnClick()
+assert(eatState.dropdownAnchor == "ForeverSnackTrackAlertEatDropdownButton")
+assert(#eatState.menuEntries == 2)
+assert(eatState.menuEntries[1].text == "Spiced Meat (10%)")
+assert(eatState.menuEntries[2].text == "Roasted Fish (5%) x2")
+eatState.items = {
+	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
+	{ bagID = 0, slot = 3, itemID = 3, stackCount = 1 },
+	{ bagID = 0, slot = 4, itemID = 1, stackCount = 2 },
+}
+eatState.menuEntries[2].func()
+assert(eatNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Roasted Fish")
+assert(eatNs.alertFrame.selectedFoodID == 1 and #eatState.usedItems == 0)
+eatState.items = { { bagID = 0, slot = 2, itemID = 2, stackCount = 1 } }
+eatState.menuEntries[2].func()
+assert(eatNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Roasted Fish"
+	and #eatState.usedItems == 0)
+
+local ns
 for _, scale in ipairs({ 0.75, 1, 1.5 }) do
-	local ns = setup({ screenScale = scale })
+	ns = setup({ screenScale = scale })
 	ns.Scan()
 	UIParent.centerX, UIParent.centerY = 960, 540
 	ns.alertFrame.centerX, ns.alertFrame.centerY = 1160 / scale, 640 / scale
@@ -122,7 +235,8 @@ for _, scale in ipairs({ 0.75, 1, 1.5 }) do
 	assert(ns.alertFrame.point[4] == 160 and ns.alertFrame.point[5] == 80)
 end
 
-local ns, state = setup({ screenDuration = 5, repeatReminders = false })
+local state
+ns, state = setup({ screenDuration = 5, repeatReminders = false })
 ns.Scan()
 state.now = 102
 ns.HideScreenAlert()
@@ -172,4 +286,10 @@ ns.Scan()
 assert(ns.alertFrame:IsShown() and ns.alertFrame.isPreview)
 ns.optionsPanel.scripts.OnHide()
 assert(not ns.alertFrame:IsShown())
-print("PASS: addon alert state, finite expiry, suppression, scaled positioning, classification and tooltip retries")
+
+ns, state = setup({ remindWhenNoFood = true })
+state.empty = true
+ns.Scan()
+assert(ns.alertFrame:IsShown())
+assert(not ns.alertFrame.eatButton:IsShown() and not ns.alertFrame.eatDropdownButton:IsShown())
+print("PASS: addon alert state, food actions, finite expiry, suppression, scaled positioning, classification and tooltip retries")

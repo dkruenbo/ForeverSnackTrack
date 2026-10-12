@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-10-13
+
+- Add a secure Eat action for the strongest available XP food, with a dropdown to select another qualifying food before clicking Eat.
+
 ## 1.0.1 - 2026-10-11
 
 - Restore the current screen alert after re-enabling screen reminders or closing a preview, even when repeat reminders are disabled.

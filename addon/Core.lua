@@ -18,6 +18,7 @@ local defaults = {
 local foodTooltipCache = {}
 local auraTooltipCache = {}
 local cachedBagResult
+local cachedQualifyingFoods
 local tooltipCacheTime
 local lastReminderTime
 local reminderState
@@ -211,6 +212,7 @@ local function hasQualifyingFood()
 
 	local unresolvedTooltip = false
 	local bestBonusPercent = 0
+	local qualifyingFoods = {}
 	local bagCount = NUM_BAG_SLOTS or 0
 	for bagID = 0, bagCount do
 		local slotCount = C_Container.GetContainerNumSlots(bagID) or 0
@@ -242,9 +244,42 @@ local function hasQualifyingFood()
 				if type(bonusPercent) == "number" and bonusPercent > bestBonusPercent then
 					bestBonusPercent = bonusPercent
 				end
+				if type(bonusPercent) == "number" and bonusPercent > 0 then
+					local matchingFood
+					for _, food in ipairs(qualifyingFoods) do
+						if food.itemID == itemID then
+							matchingFood = food
+							break
+						end
+					end
+					local count = itemInfo.stackCount or itemInfo.count or 1
+					if type(count) ~= "number" or count < 1 then
+						count = 1
+					end
+					if matchingFood then
+						matchingFood.count = matchingFood.count + count
+					else
+						local itemName = itemInfo.itemName or (GetItemInfo and GetItemInfo(itemID))
+						table.insert(qualifyingFoods, {
+							itemID = itemID,
+							itemName = itemName or ("item " .. itemID),
+							bagID = bagID,
+							slot = slot,
+							bonusPercent = bonusPercent,
+							count = count,
+						})
+					end
+				end
 			end
 		end
 	end
+	table.sort(qualifyingFoods, function(first, second)
+		if first.bonusPercent ~= second.bonusPercent then
+			return first.bonusPercent > second.bonusPercent
+		end
+		return first.itemName < second.itemName
+	end)
+	cachedQualifyingFoods = qualifyingFoods
 
 	if unresolvedTooltip then
 		return bestBonusPercent > 0 and bestBonusPercent or nil
@@ -255,9 +290,16 @@ end
 
 local function invalidateBagScan(itemID)
 	cachedBagResult = nil
+	cachedQualifyingFoods = nil
 	if itemID then
 		foodTooltipCache[itemID] = nil
 	end
+end
+
+function ns.GetAvailableFoods()
+	invalidateBagScan()
+	hasQualifyingFood()
+	return cachedQualifyingFoods or {}
 end
 
 local function hasExperienceBuff()
