@@ -318,3 +318,18 @@ local restingOptions = {
 	zhTW = "在休息區域提醒",
 }
 ForeverSnackTrackL.restingOption = restingOptions[locale] or restingOptions.enUS
+local eatButtonLabels = {
+	enUS = "Eat",
+	enGB = "Eat",
+	deDE = "Essen",
+	esES = "Comer",
+	esMX = "Comer",
+	frFR = "Manger",
+	itIT = "Mangia",
+	ptBR = "Comer",
+	ruRU = "Съесть",
+	koKR = "먹기",
+	zhCN = "进食",
+	zhTW = "進食",
+}
+ForeverSnackTrackL.eatButton = eatButtonLabels[locale] or "Eat"

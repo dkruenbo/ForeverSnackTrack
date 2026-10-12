@@ -99,4 +99,5 @@ Passing mocks does not certify Forever API availability, food classifications, l
 - Prefer explicit archive file lists over recursively zipping the workspace. Source files are authoritative; do not edit only the ZIP.
 - Preserve existing user edits and keep addon/WeakAura changes scoped. Do not commit, push, tag, rename repositories, or publish releases unless requested.
 - All requested commits and pushes must use a feature branch and a pull request targeting `main`. Never commit or push directly to `main`, bypass its protection, or merge a pull request without an explicit request.
+- After confirming a branch has merged into `main` on GitHub, switch to local `main`, fast-forward it, and delete the merged local branch. Preserve uncommitted work, and never delete a branch that has not been confirmed merged.
 - Public descriptions should be short, plain, and factual, without sales fluff or claims of unverified client support. See [addon/docs/CURSEFORGE-DESCRIPTION.md](addon/docs/CURSEFORGE-DESCRIPTION.md).

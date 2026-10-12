@@ -9,6 +9,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Sends configurable chat and screen reminders when the active buff is weaker than the best food bonus.
 - Optionally reminds you when no qualifying food is in your bags.
 - Provides a movable screen alert with custom text, duration, size, and color.
+- Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown before clicking Eat.
 - Uses a 1-minute repeat interval and unlimited screen-alert duration by default on new installations.
 - Starts with default preferences without opening options; closing options checks reminders again.
 - Supports snoozing reminders or dismissing the current reminder condition.
