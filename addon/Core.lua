@@ -198,6 +198,17 @@ local function tooltipFoodStats(tooltipData)
 		{ label = "Int", localized = STAT_INTELLECT, itemMod = ITEM_MOD_INTELLECT_SHORT, fallback = "intellect" },
 		{ label = "Sta", localized = STAT_STAMINA, itemMod = ITEM_MOD_STAMINA_SHORT, fallback = "stamina" },
 		{ label = "Spi", localized = STAT_SPIRIT, itemMod = ITEM_MOD_SPIRIT_SHORT, fallback = "spirit" },
+		{ label = "AP", localized = STAT_ATTACK_POWER, itemMod = ITEM_MOD_ATTACK_POWER_SHORT, fallback = "attack power" },
+		{ label = "Spell", localized = STAT_SPELL_DAMAGE, itemMod = ITEM_MOD_SPELL_DAMAGE_DONE_SHORT, fallback = "spell damage" },
+		{ label = "Heal", localized = STAT_HEALING_POWER, itemMod = ITEM_MOD_HEALING_DONE_SHORT, fallback = "healing power" },
+		{ label = "Armor", localized = STAT_ARMOR, itemMod = ITEM_MOD_ARMOR_SHORT, fallback = "armor" },
+		{ label = "Crit", localized = STAT_CRITICAL_STRIKE, itemMod = ITEM_MOD_CRIT_RATING_SHORT,
+			fallback = "critical strike chance", aliases = { "crit chance" }, percent = true },
+		{ label = "Move", fallback = "movement speed", percent = true },
+		{ label = "Fishing", fallback = "fishing" },
+		{ label = "Herb", fallback = "herbalism" },
+		{ label = "HP", fallback = "health", unsigned = true },
+		{ label = "Mana", fallback = "mana", unsigned = true },
 	}
 	local bonuses = {}
 	for _, definition in ipairs(definitions) do
@@ -214,6 +225,9 @@ local function tooltipFoodStats(tooltipData)
 		addTerm(definition.localized)
 		addTerm(definition.itemMod)
 		addTerm(definition.fallback)
+		for _, alias in ipairs(definition.aliases or {}) do
+			addTerm(alias)
+		end
 		local found = false
 		for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
 			local text = normalizeTooltipText(tooltipLineText(line))
@@ -222,12 +236,16 @@ local function tooltipFoodStats(tooltipData)
 				if first then
 					local before = text:sub(1, first - 1)
 					local after = text:sub(last + 1)
-					local amount = before:match("([%+%-]?%d+)%s*$")
-						or after:match("^%s*[:]?%s*([%+%-]?%d+)")
-						or after:match("^[^%d]-by%s+([%+%-]?%d+)")
-					local value = amount and tonumber(amount)
+					local amount = before:match("([%+%-]?%d+%%?)%s*$")
+						or after:match("^%s*[:]?%s*([%+%-]?%d+%%?)")
+						or after:match("^[^%d]-by%s+([%+%-]?%d+%%?)")
+					local numericAmount = amount and amount:gsub("%%", "")
+					local value = numericAmount and tonumber(numericAmount)
 					if value and value ~= 0 then
-						table.insert(bonuses, string.format("%+d %s", value, definition.label))
+						local sign = not definition.unsigned and value > 0 and "+" or ""
+						local percent = definition.percent or (amount and amount:find("%%", 1, true))
+						local suffix = percent and "%" or ""
+						table.insert(bonuses, string.format("%s%d%s %s", sign, value, suffix, definition.label))
 						found = true
 						break
 					end
