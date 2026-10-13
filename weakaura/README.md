@@ -16,6 +16,7 @@ Re-import the latest string to apply updates. Its UID is preserved for update ma
 
 - Chat and screen reminders, with a one-minute repeat interval and unlimited alert duration by default.
 - Optional restock reminders, suppressed while an XP buff is active.
+- Suppresses reminders at level 60, the level cap.
 - No reminders during combat; **Remind while resting** is off by default.
 - Custom reminder text, duration, size, color, and tooltip-matching keywords.
 - Frame-triggered scans are limited to once per second; bag and aura events scan immediately.

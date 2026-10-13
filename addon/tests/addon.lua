@@ -3,6 +3,7 @@ local addonPath = (arg[0]:match("^(.*[/\\])") or "") .. "../"
 local function setup(settings)
 	local state = {
 		now = 100,
+		level = 59,
 		chats = 0,
 		food = "Increases experience from kills by 5%",
 		classID = 0,
@@ -72,6 +73,10 @@ local function setup(settings)
 	end
 	Settings, InterfaceOptions_AddCategory = nil, nil
 	function GetTime() return state.now end
+	function UnitLevel(unit)
+		assert(unit == "player")
+		return state.level
+	end
 	function GetLocale() return "enUS" end
 	function IsResting() return state.resting end
 	function UnitAffectingCombat() return state.combat end
@@ -179,6 +184,21 @@ for _, repeatReminders in ipairs({ false, true }) do
 	state:event("PLAYER_UPDATE_RESTING")
 	assert(not ns.alertFrame:IsShown())
 end
+
+local capNs, capState = setup()
+capNs.Scan()
+assert(capState.chats == 1 and capNs.alertFrame:IsShown())
+capState.level = 60
+capState:event("PLAYER_LEVEL_UP")
+assert(capState.chats == 1 and not capNs.alertFrame:IsShown())
+capNs.optionsPanel.previewButton.scripts.OnClick()
+capNs.Scan()
+assert(capNs.alertFrame.isPreview and capNs.alertFrame:IsShown())
+capState.level = nil
+local unknownLevelNs, unknownLevelState = setup()
+unknownLevelState.level = nil
+unknownLevelNs.Scan()
+assert(unknownLevelState.chats == 1 and unknownLevelNs.alertFrame:IsShown())
 
 local eatNs, eatState = setup()
 eatState.items = {

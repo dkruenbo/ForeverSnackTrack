@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 - 2026-10-14
+
+- Suppress reminders at level 60, the level cap; players with XP locked can disable the addon.
+
 ## 1.0.2 - 2026-10-13
 
 - Add a secure Eat action for the strongest available XP food, with a dropdown to select another qualifying food before clicking Eat.

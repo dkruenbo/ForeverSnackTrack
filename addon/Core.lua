@@ -362,6 +362,17 @@ function ns.Scan()
 	if not ns.db then
 		return
 	end
+	local playerLevel = UnitLevel and UnitLevel("player")
+	if type(playerLevel) == "number" and playerLevel >= 60 then
+		lastReminderTime = nil
+		reminderState = nil
+		dismissedReminderState = nil
+		snoozeUntil = nil
+		if ns.HideScreenAlert then
+			ns.HideScreenAlert(true)
+		end
+		return
+	end
 	if not ns.db.remindWhileResting and IsResting and IsResting() then
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
@@ -656,6 +667,7 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
 eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -697,6 +709,8 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		ns.Scan()
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		invalidateBagScan()
+		ns.Scan()
+	elseif event == "PLAYER_LEVEL_UP" then
 		ns.Scan()
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		if ns.HideScreenAlert then

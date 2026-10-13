@@ -1,5 +1,9 @@
 # WeakAura Changelog
 
+## Unreleased
+
+- Suppress reminders at level 60, the level cap; no separate XP-lock detection is added.
+
 ## 2026-10-11
 
 - Limit frame-triggered scans to once per second; bag and aura events still scan immediately.
