@@ -103,6 +103,9 @@ local function createAlertFrame()
 			if food.count > 1 then
 				info.text = info.text .. string.format(" x%d", food.count)
 			end
+			if #food.stats > 0 then
+				info.text = info.text .. " - " .. table.concat(food.stats, ", ")
+			end
 			info.checked = frame.selectedFoodID == food.itemID
 			info.func = function()
 				setEatFood(frame, food.itemID)

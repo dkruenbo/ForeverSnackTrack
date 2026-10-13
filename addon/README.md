@@ -10,7 +10,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Suppresses reminders at level 60, the level cap. Players with XP locked can disable the addon.
 - Optionally reminds you when no qualifying food is in your bags.
 - Provides a movable screen alert with custom text, duration, size, and color.
-- Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown before clicking Eat.
+- Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown, which shows its XP bonus, stack count, and recognized primary stats.
 - Uses a 1-minute repeat interval and unlimited screen-alert duration by default on new installations.
 - Starts with default preferences without opening options; closing options checks reminders again.
 - Supports snoozing reminders or dismissing the current reminder condition.

@@ -3,6 +3,7 @@
 ## 1.0.3 - 2026-10-14
 
 - Suppress reminders at level 60, the level cap; players with XP locked can disable the addon.
+- Show recognized Strength, Agility, Intellect, Stamina, and Spirit bonuses in the food dropdown.
 
 ## 1.0.2 - 2026-10-13
 

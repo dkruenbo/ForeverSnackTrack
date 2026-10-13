@@ -16,6 +16,7 @@ local defaults = {
 }
 
 local foodTooltipCache = {}
+local foodStatsCache = {}
 local auraTooltipCache = {}
 local cachedBagResult
 local cachedQualifyingFoods
@@ -190,6 +191,56 @@ local function tooltipExperienceBonusPercent(tooltipData)
 	return false
 end
 
+local function tooltipFoodStats(tooltipData)
+	local definitions = {
+		{ label = "Str", localized = STAT_STRENGTH, itemMod = ITEM_MOD_STRENGTH_SHORT, fallback = "strength" },
+		{ label = "Agi", localized = STAT_AGILITY, itemMod = ITEM_MOD_AGILITY_SHORT, fallback = "agility" },
+		{ label = "Int", localized = STAT_INTELLECT, itemMod = ITEM_MOD_INTELLECT_SHORT, fallback = "intellect" },
+		{ label = "Sta", localized = STAT_STAMINA, itemMod = ITEM_MOD_STAMINA_SHORT, fallback = "stamina" },
+		{ label = "Spi", localized = STAT_SPIRIT, itemMod = ITEM_MOD_SPIRIT_SHORT, fallback = "spirit" },
+	}
+	local bonuses = {}
+	for _, definition in ipairs(definitions) do
+		local terms = {}
+		local function addTerm(candidate)
+			if type(candidate) == "string" then
+				local term = normalizeTooltipText(candidate):gsub("%%[ds]", "")
+				term = term:gsub("[%+%p]", " "):match("^%s*(.-)%s*$")
+				if term ~= "" then
+					table.insert(terms, term)
+				end
+			end
+		end
+		addTerm(definition.localized)
+		addTerm(definition.itemMod)
+		addTerm(definition.fallback)
+		local found = false
+		for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
+			local text = normalizeTooltipText(tooltipLineText(line))
+			for _, term in ipairs(terms) do
+				local first, last = text:find(term, 1, true)
+				if first then
+					local before = text:sub(1, first - 1)
+					local after = text:sub(last + 1)
+					local amount = before:match("([%+%-]?%d+)%s*$")
+						or after:match("^%s*[:]?%s*([%+%-]?%d+)")
+						or after:match("^[^%d]-by%s+([%+%-]?%d+)")
+					local value = amount and tonumber(amount)
+					if value and value ~= 0 then
+						table.insert(bonuses, string.format("%+d %s", value, definition.label))
+						found = true
+						break
+					end
+				end
+			end
+			if found then
+				break
+			end
+		end
+	end
+	return bonuses
+end
+
 local function foodItemType(itemID)
 	local getInfo = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
 	if not getInfo then
@@ -227,11 +278,12 @@ local function hasQualifyingFood()
 					bonusPercent = nil
 				elseif not isFood then
 					bonusPercent = false
-				elseif bonusPercent == nil then
+				elseif bonusPercent == nil or foodStatsCache[itemID] == nil then
 					local tooltipData = C_TooltipInfo and C_TooltipInfo.GetBagItem
 						and C_TooltipInfo.GetBagItem(bagID, slot)
 					if tooltipData and type(tooltipData.lines) == "table" and #tooltipData.lines > 1 then
 						bonusPercent = tooltipExperienceBonusPercent(tooltipData)
+						foodStatsCache[itemID] = tooltipFoodStats(tooltipData)
 						if type(bonusPercent) == "number" then
 							foodTooltipCache[itemID] = bonusPercent
 						elseif bonusPercent == nil then
@@ -267,6 +319,7 @@ local function hasQualifyingFood()
 							slot = slot,
 							bonusPercent = bonusPercent,
 							count = count,
+							stats = foodStatsCache[itemID] or {},
 						})
 					end
 				end
@@ -293,6 +346,7 @@ local function invalidateBagScan(itemID)
 	cachedQualifyingFoods = nil
 	if itemID then
 		foodTooltipCache[itemID] = nil
+		foodStatsCache[itemID] = nil
 	end
 end
 
@@ -398,6 +452,7 @@ function ns.Scan()
 	local now = GetTime()
 	if not tooltipCacheTime or now - tooltipCacheTime >= 60 then
 		foodTooltipCache = {}
+		foodStatsCache = {}
 		auraTooltipCache = {}
 		cachedBagResult = nil
 		tooltipCacheTime = now
