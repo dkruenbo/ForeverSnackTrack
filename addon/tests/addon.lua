@@ -225,7 +225,7 @@ eatState.statLinesByItem = {
 		"Increases your Strength by 8",
 		"+3 Stamina",
 		"Increases your Spirit by 2",
-		"Use: Restores 59 health over 18 sec and grants 2 Attack Power for 15 min",
+		"Use: Restores 59 health and 145 mana over 18 sec and grants 2 Attack Power for 15 min",
 		"+1 Spell Damage",
 		"+2 Healing Power",
 		"+150 Armor",
@@ -253,7 +253,7 @@ eatNs.alertFrame.eatDropdownButton.scripts.OnClick()
 assert(eatState.dropdownAnchor == "ForeverSnackTrackAlertEatDropdownButton")
 assert(#eatState.menuEntries == 2)
 assert(eatState.menuEntries[1].text == "Spiced Meat (10%) - +5 Int")
-assert(eatState.menuEntries[2].text == "Roasted Fish (5%) x2 - +8 Str, +12 Agi, +3 Sta, +2 Spi, +2 AP, +1 Spell, +2 Heal, +150 Armor, +1% Crit, +15% Move, +3 Fishing, +15 Herb, 59 HP")
+assert(eatState.menuEntries[2].text == "Roasted Fish (5%) x2 - +8 Str, +12 Agi, +3 Sta, +2 Spi, +2 AP, +1 Spell, +2 Heal, +150 Armor, +1% Crit, +15% Move, +3 Fishing, +15 Herb")
 eatState.items = {
 	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
 	{ bagID = 0, slot = 3, itemID = 3, stackCount = 1 },

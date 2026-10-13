@@ -3,7 +3,7 @@
 ## 1.0.3 - 2026-10-14
 
 - Suppress reminders at level 60, the level cap; players with XP locked can disable the addon.
-- Show recognized stat and consumable effects, such as attack power, spell damage, healing, armor, crit, movement speed, and professions, in the food dropdown.
+- Show recognized stat bonuses, such as attack power, spell damage, healing, armor, crit, movement speed, and professions, in the food dropdown.
 
 ## 1.0.2 - 2026-10-13
 

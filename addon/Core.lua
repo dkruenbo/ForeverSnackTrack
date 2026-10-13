@@ -207,8 +207,6 @@ local function tooltipFoodStats(tooltipData)
 		{ label = "Move", fallback = "movement speed", percent = true },
 		{ label = "Fishing", fallback = "fishing" },
 		{ label = "Herb", fallback = "herbalism" },
-		{ label = "HP", fallback = "health", unsigned = true },
-		{ label = "Mana", fallback = "mana", unsigned = true },
 	}
 	local bonuses = {}
 	for _, definition in ipairs(definitions) do
@@ -242,7 +240,7 @@ local function tooltipFoodStats(tooltipData)
 					local numericAmount = amount and amount:gsub("%%", "")
 					local value = numericAmount and tonumber(numericAmount)
 					if value and value ~= 0 then
-						local sign = not definition.unsigned and value > 0 and "+" or ""
+						local sign = value > 0 and "+" or ""
 						local percent = definition.percent or (amount and amount:find("%%", 1, true))
 						local suffix = percent and "%" or ""
 						table.insert(bonuses, string.format("%s%d%s %s", sign, value, suffix, definition.label))
