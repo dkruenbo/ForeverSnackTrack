@@ -302,7 +302,11 @@ ForeverSnackTrackLocales = {
 }
 
 local locale = GetLocale and GetLocale() or "enUS"
-ForeverSnackTrackL = ForeverSnackTrackLocales[locale] or ForeverSnackTrackLocales.enUS
+local enUS = ForeverSnackTrackLocales.enUS
+ForeverSnackTrackL = ForeverSnackTrackLocales[locale] or enUS
+if ForeverSnackTrackL ~= enUS then
+	setmetatable(ForeverSnackTrackL, { __index = enUS })
+end
 local restingOptions = {
 	enUS = "Remind while resting",
 	enGB = "Remind while resting",

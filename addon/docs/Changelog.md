@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Player-facing
+
+- Hide the on-screen reminder while dead and restore it after resurrection without suppressing chat reminders.
+- Keep the Eat action available for recognized XP food when another item's tooltip is unresolved.
+
+### Technical
+
+- Parse stats only for XP food, reuse available-food results, and coalesce aura-triggered scans while still invalidating buff caches.
+- Cache negative food and buff results only when their item-use or spell descriptions confirm tooltip completeness; otherwise retry.
+- Let a known sufficient XP buff resolve the comparison even if another aura tooltip is unresolved.
+- Add English fallback for missing locale keys and guard optional dropdown helpers.
+
 ## 1.0.3 - 2026-10-14
 
 - Suppress reminders at level 60, the level cap; players with XP locked can disable the addon.

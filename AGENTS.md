@@ -17,6 +17,7 @@ Forever SnackTrack reminds players to use the best kill-XP food in their bags wh
 - Implementation-specific instructions are in [addon/README.md](addon/README.md) and [weakaura/README.md](weakaura/README.md).
 - Addon fixes belong in [addon/docs/Changelog.md](addon/docs/Changelog.md); do not mention WeakAura changes there.
 - WeakAura fixes belong in [weakaura/WA-changelog.md](weakaura/WA-changelog.md). Editing addon Lua does not update the encoded import, or vice versa.
+- In each changelog's current Unreleased section and future patch entries, group notes under `### Player-facing` followed by `### Technical`. Describe user-visible effects first, keep implementation detail concise, and omit either heading when it has no entries. Leave historical release sections unchanged unless asked.
 - Do not create multiple competing import strings or leave old release archives around without a reason.
 
 ## Addon Architecture
@@ -48,6 +49,7 @@ The TOC loads `Locale.lua`, `ScreenAlert.lua`, `Core.lua`, then `Options.lua`. M
 
 - Defaults: chat and screen enabled, repeat every minute, unlimited real alert, restock reminders off, **Remind while resting off**. New installations do not open options or require setup.
 - Suppress real reminders during combat and, by default, while `IsResting()` is true. Check again on combat/resting transitions.
+- While dead, hide the on-screen reminder without suppressing chat; check again on `PLAYER_ALIVE` or `PLAYER_UNGHOST` in both implementations.
 - Chat delivery is rate-limited; screen visibility is separate state. Restoring a hidden eligible alert must not resend chat or reset its repeat timer.
 - Repeat disabled means no extra chat for the same condition merely because combat or resting ended.
 - Restoring an alert must respect snooze, dismissal, current condition, enabled channels, and finite expiry. Do not re-show an expired finite alert on every scan.
@@ -87,13 +89,13 @@ git diff --check
 
 The WeakAura runner needs Python 3 and Lua; it decodes the checked-in import and runs its Lua tests without changing the import. Addon tests use mocked WoW APIs and also run from inside `addon/` with `lua tests/addon.lua`.
 
-Required regression scenarios: preview open/close and screen toggles with repeats on/off; combat/resting transitions without extra chat; snooze/dismiss across transitions; finite expiry; dragging at 75%, 100%, and 150% then changing scale; unknown item metadata and loading/title-only tooltips; active buff after consuming the last food; non-food XP items; mixed percentages; and WeakAura throttling/saved positioning.
+Required regression scenarios: preview open/close and screen toggles with repeats on/off; combat/resting/death transitions without unintended chat changes; snooze/dismiss across transitions; finite expiry; dragging at 75%, 100%, and 150% then changing scale; title-only and multi-line partial tooltips followed by loaded XP descriptions; short complete food/buff descriptions; preservation of known XP-food actions when another item is unresolved; negative food-cache invalidation through `GET_ITEM_INFO_RECEIVED`; cached buff invalidation on `UNIT_AURA`; coalesced aura bursts followed by a later event; a sufficient XP buff alongside an unresolved aura; active buff after consuming the last food; non-food XP items; mixed percentages; and WeakAura throttling/saved positioning.
 
 Passing mocks does not certify Forever API availability, food classifications, localized tooltip wording, frame layout, or import/update behavior. Report in-game validation separately. Use `/fst debug` with real food/buff tooltips when investigating detection failures.
 
 ## Release And Collaboration
 
-- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.2`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
+- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.4`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
 - After runtime/TOC changes, rebuild the addon ZIP and name it `ForeverSnackTrack-<version>.zip` using the TOC version; update documented download links to match. Archive entries must be `ForeverSnackTrack/` plus the TOC and four runtime Lua files, not an `addon/` folder.
 - Exclude `.DS_Store`, `__MACOSX`, tests, planning docs, WeakAura files, and repository settings. Verify archive integrity and byte-for-byte source parity.
 - Prefer explicit archive file lists over recursively zipping the workspace. Source files are authoritative; do not edit only the ZIP.

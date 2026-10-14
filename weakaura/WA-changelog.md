@@ -2,7 +2,10 @@
 
 ## Unreleased
 
+### Player-facing
+
 - Suppress reminders at level 60, the level cap; no separate XP-lock detection is added.
+- Hide the on-screen reminder while dead and restore it after resurrection without suppressing chat reminders.
 
 ## 2026-10-11
 

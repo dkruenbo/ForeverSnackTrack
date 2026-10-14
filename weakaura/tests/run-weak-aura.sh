@@ -31,6 +31,7 @@ def code(key):
     }.get(match[1], chr(ord(match[1]) - 64)), escaped)
 
 subprocess.run(['lua', 'tests/weak-aura.lua'],
-    input='{trigger=' + code('custom') + ',text=' + code('customText') + '}',
+    input='{trigger=' + code('custom') + ',text=' + code('customText')
+        + ',events=' + repr(code('events')) + '}',
     text=True, check=True)
 PY

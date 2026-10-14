@@ -5,6 +5,7 @@ local function setup(settings)
 		now = 100,
 		level = 59,
 		chats = 0,
+		messages = {},
 		food = "Increases experience from kills by 5%",
 		classID = 0,
 		subclassID = 5,
@@ -16,6 +17,14 @@ local function setup(settings)
 		usedItems = {},
 		menuEntries = {},
 		dropdownAnchor = nil,
+		pendingTimers = {},
+		bagReads = 0,
+		buffReads = 0,
+		auraReads = 0,
+		foodTooltips = {},
+		buffTooltips = {},
+		spellDescriptions = {},
+		auras = nil,
 	}
 	local methods = {}
 	local function object()
@@ -62,11 +71,20 @@ local function setup(settings)
 	end
 	UIParent = object()
 	SlashCmdList = {}
-	UIDropDownMenu_SetSelectedValue = function() end
-	UIDropDownMenu_SetWidth = function() end
-	UIDropDownMenu_Initialize = function(dropdown, initialize) dropdown.initialize = initialize end
-	UIDropDownMenu_CreateInfo = function() return {} end
-	UIDropDownMenu_AddButton = function(info) table.insert(state.menuEntries, info) end
+	C_Timer = { After = function(delay, callback)
+		assert(delay == 0.5)
+		table.insert(state.pendingTimers, callback)
+	end }
+	if settings and settings.missingDropdownApis then
+		UIDropDownMenu_SetSelectedValue, UIDropDownMenu_SetWidth = nil, nil
+		UIDropDownMenu_Initialize, UIDropDownMenu_CreateInfo, UIDropDownMenu_AddButton = nil, nil, nil
+	else
+		UIDropDownMenu_SetSelectedValue = function() end
+		UIDropDownMenu_SetWidth = function() end
+		UIDropDownMenu_Initialize = function(dropdown, initialize) dropdown.initialize = initialize end
+		UIDropDownMenu_CreateInfo = function() return {} end
+		UIDropDownMenu_AddButton = function(info) table.insert(state.menuEntries, info) end
+	end
 	ToggleDropDownMenu = function(_, _, dropdown, anchorName)
 		state.dropdownAnchor = anchorName
 		state.menuEntries = {}
@@ -78,14 +96,20 @@ local function setup(settings)
 		assert(unit == "player")
 		return state.level
 	end
-	function GetLocale() return "enUS" end
+	function GetLocale() return settings and settings.locale or "enUS" end
 	function IsResting() return state.resting end
 	function UnitAffectingCombat() return state.combat end
+	function UnitIsDeadOrGhost(unit)
+		assert(unit == "player")
+		return state.dead
+	end
 	function GetItemInfo(itemID) return state.itemNames[itemID] end
 	STAT_STRENGTH, STAT_AGILITY, STAT_INTELLECT = "Strength", "Agility", "Intellect"
 	STAT_STAMINA, STAT_SPIRIT = "Stamina", "Spirit"
 	NUM_BAG_SLOTS = 0
 	RETRIEVING_ITEM_INFO = "Retrieving item information"
+	ITEM_SPELL_TRIGGER_ONUSE = "Use: %s"
+	C_Spell = { GetSpellDescription = function(spellID) return state.spellDescriptions[spellID] end }
 	C_Item = { GetItemInfoInstant = function(itemID)
 		local itemType = state.itemTypes[itemID]
 		return itemID, nil, nil, nil, nil,
@@ -123,23 +147,34 @@ local function setup(settings)
 	}
 	C_TooltipInfo = {
 		GetBagItem = function(bagID, slot)
+			state.bagReads = state.bagReads + 1
 			if state.partial then return { lines = { { leftText = "Food" } } } end
 			local itemID = 1
 			for _, item in ipairs(state.items) do
 				if item.bagID == bagID and item.slot == slot then itemID = item.itemID end
 			end
+			if state.foodTooltips[itemID] then return state.foodTooltips[itemID] end
 			local lines = { { leftText = "Food" }, { leftText = state.foodsByItem[itemID] or state.food } }
 			for _, text in ipairs(state.statLinesByItem[itemID] or {}) do
 				table.insert(lines, { leftText = text })
 			end
 			return { lines = lines }
 		end,
-		GetUnitBuff = function() return { lines = { { leftText = state.buff } } } end,
+		GetUnitBuff = function(_, index)
+			state.buffReads = state.buffReads + 1
+			local aura = state.auras and state.auras[index]
+			return state.buffTooltips[index] or { lines = { { leftText = aura and aura.name or state.buff } } }
+		end,
 	}
 	C_UnitAuras = { GetAuraDataByIndex = function(_, index)
+		state.auraReads = state.auraReads + 1
+		if state.auras then return state.auras[index] end
 		if index == 1 and state.buff then return { spellId = 1, name = "Well Fed" } end
 	end }
-	DEFAULT_CHAT_FRAME = { AddMessage = function() state.chats = state.chats + 1 end }
+	DEFAULT_CHAT_FRAME = { AddMessage = function(_, message)
+		state.chats = state.chats + 1
+		table.insert(state.messages, message)
+	end }
 	ForeverSnackTrackDB, ForeverExpFoodDB = settings or {}, nil
 	local ns = {}
 	assert(loadfile(addonPath .. "Locale.lua"))()
@@ -148,6 +183,11 @@ local function setup(settings)
 	end
 	function state:event(event, arg)
 		self.eventFrame.scripts.OnEvent(self.eventFrame, event, arg)
+	end
+	function state:runTimers()
+		local pendingTimers = self.pendingTimers
+		self.pendingTimers = {}
+		for _, callback in ipairs(pendingTimers) do callback() end
 	end
 	state:event("ADDON_LOADED", "ForeverSnackTrack")
 	return ns, state
@@ -180,6 +220,19 @@ for _, repeatReminders in ipairs({ false, true }) do
 	state.resting = false
 	state:event("PLAYER_UPDATE_RESTING")
 	assert(ns.alertFrame:IsShown() and state.chats == 1)
+	state.dead = true
+	state:event("PLAYER_DEAD")
+	assert(not ns.alertFrame:IsShown())
+	ns.Scan()
+	assert(not ns.alertFrame:IsShown() and state.chats == 1)
+	state.dead = false
+	state:event("PLAYER_ALIVE")
+	assert(ns.alertFrame:IsShown() and state.chats == 1)
+	state.dead = true
+	state:event("PLAYER_DEAD")
+	state.dead = false
+	state:event("PLAYER_UNGHOST")
+	assert(ns.alertFrame:IsShown() and state.chats == 1)
 	ns.SnoozeReminders()
 	state:event("PLAYER_REGEN_ENABLED")
 	assert(not ns.alertFrame:IsShown())
@@ -191,6 +244,17 @@ for _, repeatReminders in ipairs({ false, true }) do
 	state:event("PLAYER_UPDATE_RESTING")
 	assert(not ns.alertFrame:IsShown())
 end
+
+local deadChatNs, deadChatState = setup({ repeatReminders = true, reminderMinutes = 1 })
+deadChatNs.Scan()
+deadChatState.now = 160
+deadChatState.dead = true
+deadChatState:event("PLAYER_DEAD")
+deadChatState:event("BAG_UPDATE_DELAYED")
+assert(deadChatState.chats == 2 and not deadChatNs.alertFrame:IsShown())
+deadChatState.dead = false
+deadChatState:event("PLAYER_ALIVE")
+assert(deadChatState.chats == 2 and deadChatNs.alertFrame:IsShown())
 
 local capNs, capState = setup()
 capNs.Scan()
@@ -272,6 +336,27 @@ debugState.statLinesByItem[1] = { "Increases your Strength by 6" }
 debugNs.DebugStatus()
 local debugFoods = debugNs.GetAvailableFoods()
 assert(#debugFoods == 1 and debugFoods[1].stats[1] == "+6 Str")
+local debugNegativeNs, debugNegativeState = setup()
+debugNegativeState.foodTooltips[1] = { lines = {
+	{ leftText = "Bread" }, { leftText = "Food" }, { leftText = "Use: Restores 20 health" },
+} }
+debugNegativeNs.DebugStatus()
+debugNegativeNs.GetAvailableFoods()
+assert(debugNegativeState.bagReads == 1)
+local debugBuffNs, debugBuffState = setup()
+debugBuffState.buff = "Well Fed"
+debugBuffState.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Aura type" },
+} }
+debugBuffNs.DebugStatus()
+local foundUnresolvedBuffCount = false
+for _, message in ipairs(debugBuffState.messages) do
+	if message:find("1 buff tooltip(s) unavailable or incomplete", 1, true) then
+		foundUnresolvedBuffCount = true
+		break
+	end
+end
+assert(foundUnresolvedBuffCount)
 
 local ns
 for _, scale in ipairs({ 0.75, 1, 1.5 }) do
@@ -306,10 +391,123 @@ assert(state.chats == 0)
 state.partial = false
 state:event("BAG_UPDATE_DELAYED")
 assert(state.chats == 1)
+
+ns, state = setup()
+state.foodTooltips[1] = { lines = { { leftText = "Roasted Fish" }, { leftText = "Food" } } }
+ns.Scan()
+assert(state.chats == 0 and state.bagReads == 1)
+state.foodTooltips[1] = { lines = {
+	{ leftText = "Roasted Fish" }, { leftText = "Food" },
+	{ leftText = "Increases experience from kills by 5%" },
+} }
+ns.Scan()
+assert(state.chats == 1 and state.bagReads == 2)
+
+ns, state = setup()
+state.items = {
+	{ bagID = 0, slot = 1, itemID = 1, stackCount = 1 },
+	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
+}
+state.foodTooltips[2] = { lines = { { leftText = "Bread" }, { leftText = "Food" } } }
+ns.Scan()
+assert(ns.alertFrame:IsShown())
+assert(ns.alertFrame.eatButton:IsShown() and ns.alertFrame.eatDropdownButton:IsShown())
+assert(#ns.GetAvailableFoods() == 1)
+
+ns, state = setup()
+state.buff = "Well Fed"
+state.buffTooltips[1] = { lines = { { leftText = "Well Fed" }, { leftText = "Binds when picked up" } } }
+ns.Scan()
+assert(state.chats == 0 and state.buffReads == 1)
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Spell effect" },
+	{ leftText = "Increases experience from kills by 5%" },
+} }
+ns.Scan()
+assert(state.chats == 0 and state.buffReads == 2)
+
+ns, state = setup()
+state.auras = {
+	{ spellId = 1, name = "Unresolved aura" },
+	{ spellId = 2, name = "Kill XP" },
+}
+state.buffTooltips[1] = { lines = { { leftText = "Unresolved aura" }, { leftText = "Aura type" } } }
+state.spellDescriptions[1] = ""
+state.buffTooltips[2] = { lines = {
+	{ leftText = "Kill XP" }, { leftText = "Increases experience from kills by 10%" },
+} }
+ns.Scan()
+assert(state.chats == 0 and (not ns.alertFrame or not ns.alertFrame:IsShown()))
+
+ns, state = setup({ remindWhenNoFood = true })
+state.foodTooltips[1] = { lines = {
+	{ leftText = "Bread" }, { leftText = "Food" }, { leftText = "Use: Restores 20 health" },
+} }
+ns.Scan()
+assert(state.chats == 1 and state.bagReads == 1)
+state.foodTooltips[1] = { lines = {
+	{ leftText = "Bread" }, { leftText = "Food" },
+	{ leftText = "Increases experience from kills by 5%" },
+} }
+ns.Scan()
+assert(state.chats == 1 and state.bagReads == 1)
+state:event("GET_ITEM_INFO_RECEIVED", 1)
+assert(state.chats == 2 and state.bagReads == 2)
+
+ns, state = setup()
+ns.Scan()
+assert(state.bagReads == 1)
+ns.GetAvailableFoods()
+ns.GetAvailableFoods()
+assert(state.bagReads == 1)
+state.items = {
+	{ bagID = 0, slot = 1, itemID = 1, stackCount = 1 },
+	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
+}
+state.foodsByItem[2] = "Increases experience from kills by 10%"
+state:event("BAG_UPDATE_DELAYED")
+assert(state.bagReads == 2)
+assert(#ns.GetAvailableFoods() == 2)
+state.now = 160
+ns.Scan()
+assert(state.bagReads == 4)
+ns.GetAvailableFoods()
+assert(state.bagReads == 4)
+
+ns, state = setup()
+state.buff = "Well Fed"
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Restores health" },
+} }
+state.spellDescriptions[1] = "Restores health."
+ns.Scan()
+assert(state.chats == 1 and state.buffReads == 1)
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Spell effect" },
+	{ leftText = "Increases experience from kills by 5%" },
+} }
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(state.chats == 1 and state.buffReads == 2 and not ns.alertFrame:IsShown())
+
+ns, state = setup()
+ns.Scan()
+state.auraReads = 0
+for _ = 1, 5 do
+	state:event("UNIT_AURA", "player")
+end
+assert(state.auraReads == 0 and #state.pendingTimers == 1)
+state:runTimers()
+assert(state.auraReads == 1)
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(state.auraReads == 2)
+
 state.buff = "Well Fed"
 state:event("UNIT_AURA", "player")
 state.buff = "Increases experience from kills by 5%"
 state:event("UNIT_AURA", "player")
+state:runTimers()
 assert(not ns.alertFrame:IsShown())
 
 for _, classification in ipairs({ { 4, 1 }, { 0, 1 } }) do
@@ -344,4 +542,18 @@ state.empty = true
 ns.Scan()
 assert(ns.alertFrame:IsShown())
 assert(not ns.alertFrame.eatButton:IsShown() and not ns.alertFrame.eatDropdownButton:IsShown())
+
+local noDropdownNs = setup({ missingDropdownApis = true })
+noDropdownNs.Scan()
+noDropdownNs.alertFrame.eatDropdownButton.scripts.OnClick()
+assert(noDropdownNs.alertFrame:IsShown())
+
+setup({ locale = "enUS" })
+local missingKeyOK, missingEnglishKey = pcall(function() return ForeverSnackTrackL.missingKey end)
+assert(missingKeyOK and missingEnglishKey == nil)
+local localeNs = setup({ locale = "deDE" })
+local germanChatOption = ForeverSnackTrackL.chatOption
+ForeverSnackTrackLocales.deDE.noFoodOption = nil
+assert(germanChatOption == "Chatnachricht")
+assert(ForeverSnackTrackL.noFoodOption == ForeverSnackTrackLocales.enUS.noFoodOption)
 print("PASS: addon alert state, food actions, finite expiry, suppression, scaled positioning, classification and tooltip retries")

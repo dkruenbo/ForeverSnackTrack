@@ -21,7 +21,9 @@ local function refreshOptions()
 	panel.repeatCheckbox:SetChecked(ns.db.repeatReminders)
 	panel.intervalSlider:SetValue(ns.db.reminderMinutes)
 	panel.intervalSlider:SetEnabled(ns.db.repeatReminders)
-	UIDropDownMenu_SetSelectedValue(panel.snoozeDropdown, ns.db.snoozeMinutes)
+	if UIDropDownMenu_SetSelectedValue then
+		UIDropDownMenu_SetSelectedValue(panel.snoozeDropdown, ns.db.snoozeMinutes)
+	end
 	panel.messageBox:SetText(ns.db.screenMessage)
 	panel.durationSlider:SetValue(ns.db.screenDuration == 0 and 21 or ns.db.screenDuration)
 	panel.scaleSlider:SetValue(ns.db.screenScale * 100)
@@ -108,22 +110,28 @@ function ns.InitializeOptions()
 
 	panel.snoozeDropdown = CreateFrame("Frame", "ForeverSnackTrackSnoozeDropdown", panel, "UIDropDownMenuTemplate")
 	panel.snoozeDropdown:SetPoint("TOPLEFT", snoozeLabel, "BOTTOMLEFT", -16, -2)
-	UIDropDownMenu_SetWidth(panel.snoozeDropdown, 105)
-	UIDropDownMenu_Initialize(panel.snoozeDropdown, function(_, level)
-		for _, minutes in ipairs({ 1, 5, 10, 15, 30, 60 }) do
-			local duration = minutes
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = string.format(L.snoozeDuration, duration)
-			info.value = duration
-			info.checked = ns.db.snoozeMinutes == duration
-			info.func = function()
-				ns.db.snoozeMinutes = duration
-				UIDropDownMenu_SetSelectedValue(panel.snoozeDropdown, duration)
-				ns.RefreshAlertButtons()
+	if UIDropDownMenu_SetWidth then
+		UIDropDownMenu_SetWidth(panel.snoozeDropdown, 105)
+	end
+	if UIDropDownMenu_Initialize and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
+		UIDropDownMenu_Initialize(panel.snoozeDropdown, function(_, level)
+			for _, minutes in ipairs({ 1, 5, 10, 15, 30, 60 }) do
+				local duration = minutes
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = string.format(L.snoozeDuration, duration)
+				info.value = duration
+				info.checked = ns.db.snoozeMinutes == duration
+				info.func = function()
+					ns.db.snoozeMinutes = duration
+					if UIDropDownMenu_SetSelectedValue then
+						UIDropDownMenu_SetSelectedValue(panel.snoozeDropdown, duration)
+					end
+					ns.RefreshAlertButtons()
+				end
+				UIDropDownMenu_AddButton(info, level)
 			end
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end)
+		end)
+	end
 
 	local messageLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	messageLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -330)
