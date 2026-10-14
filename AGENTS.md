@@ -93,8 +93,8 @@ Passing mocks does not certify Forever API availability, food classifications, l
 
 ## Release And Collaboration
 
-- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.1`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
-- After runtime/TOC changes, rebuild [addon/ForeverSnackTrack.zip](addon/ForeverSnackTrack.zip). Archive entries must be `ForeverSnackTrack/` plus the TOC and four runtime Lua files, not an `addon/` folder.
+- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.2`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
+- After runtime/TOC changes, rebuild the addon ZIP and name it `ForeverSnackTrack-<version>.zip` using the TOC version; update documented download links to match. Archive entries must be `ForeverSnackTrack/` plus the TOC and four runtime Lua files, not an `addon/` folder.
 - Exclude `.DS_Store`, `__MACOSX`, tests, planning docs, WeakAura files, and repository settings. Verify archive integrity and byte-for-byte source parity.
 - Prefer explicit archive file lists over recursively zipping the workspace. Source files are authoritative; do not edit only the ZIP.
 - Preserve existing user edits and keep addon/WeakAura changes scoped. Do not commit, push, tag, rename repositories, or publish releases unless requested.

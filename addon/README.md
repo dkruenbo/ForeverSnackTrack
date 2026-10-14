@@ -7,9 +7,10 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Scans carried bags for items classified as food and drink whose tooltip grants additional experience from kills and extracts its percentage.
 - Compares food bonuses with the active `Well Fed` XP buff; an equal or stronger buff suppresses reminders.
 - Sends configurable chat and screen reminders when the active buff is weaker than the best food bonus.
+- Suppresses reminders at level 60, the level cap. Players with XP locked can disable the addon.
 - Optionally reminds you when no qualifying food is in your bags.
 - Provides a movable screen alert with custom text, duration, size, and color.
-- Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown before clicking Eat.
+- Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown, which shows its XP bonus, stack count, and recognized stat bonuses.
 - Uses a 1-minute repeat interval and unlimited screen-alert duration by default on new installations.
 - Starts with default preferences without opening options; closing options checks reminders again.
 - Supports snoozing reminders or dismissing the current reminder condition.
@@ -20,7 +21,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack.zip](ForeverSnackTrack.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.3.zip](ForeverSnackTrack-1.0.3.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, or no longer needed. Choose a finite alert duration in the options if preferred.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.

@@ -3,6 +3,7 @@ local addonPath = (arg[0]:match("^(.*[/\\])") or "") .. "../"
 local function setup(settings)
 	local state = {
 		now = 100,
+		level = 59,
 		chats = 0,
 		food = "Increases experience from kills by 5%",
 		classID = 0,
@@ -11,6 +12,7 @@ local function setup(settings)
 		itemTypes = {},
 		itemNames = {},
 		foodsByItem = {},
+		statLinesByItem = {},
 		usedItems = {},
 		menuEntries = {},
 		dropdownAnchor = nil,
@@ -72,10 +74,16 @@ local function setup(settings)
 	end
 	Settings, InterfaceOptions_AddCategory = nil, nil
 	function GetTime() return state.now end
+	function UnitLevel(unit)
+		assert(unit == "player")
+		return state.level
+	end
 	function GetLocale() return "enUS" end
 	function IsResting() return state.resting end
 	function UnitAffectingCombat() return state.combat end
 	function GetItemInfo(itemID) return state.itemNames[itemID] end
+	STAT_STRENGTH, STAT_AGILITY, STAT_INTELLECT = "Strength", "Agility", "Intellect"
+	STAT_STAMINA, STAT_SPIRIT = "Stamina", "Spirit"
 	NUM_BAG_SLOTS = 0
 	RETRIEVING_ITEM_INFO = "Retrieving item information"
 	C_Item = { GetItemInfoInstant = function(itemID)
@@ -120,7 +128,11 @@ local function setup(settings)
 			for _, item in ipairs(state.items) do
 				if item.bagID == bagID and item.slot == slot then itemID = item.itemID end
 			end
-			return { lines = { { leftText = "Food" }, { leftText = state.foodsByItem[itemID] or state.food } } }
+			local lines = { { leftText = "Food" }, { leftText = state.foodsByItem[itemID] or state.food } }
+			for _, text in ipairs(state.statLinesByItem[itemID] or {}) do
+				table.insert(lines, { leftText = text })
+			end
+			return { lines = lines }
 		end,
 		GetUnitBuff = function() return { lines = { { leftText = state.buff } } } end,
 	}
@@ -180,6 +192,21 @@ for _, repeatReminders in ipairs({ false, true }) do
 	assert(not ns.alertFrame:IsShown())
 end
 
+local capNs, capState = setup()
+capNs.Scan()
+assert(capState.chats == 1 and capNs.alertFrame:IsShown())
+capState.level = 60
+capState:event("PLAYER_LEVEL_UP")
+assert(capState.chats == 1 and not capNs.alertFrame:IsShown())
+capNs.optionsPanel.previewButton.scripts.OnClick()
+capNs.Scan()
+assert(capNs.alertFrame.isPreview and capNs.alertFrame:IsShown())
+capState.level = nil
+local unknownLevelNs, unknownLevelState = setup()
+unknownLevelState.level = nil
+unknownLevelNs.Scan()
+assert(unknownLevelState.chats == 1 and unknownLevelNs.alertFrame:IsShown())
+
 local eatNs, eatState = setup()
 eatState.items = {
 	{ bagID = 0, slot = 1, itemID = 1, stackCount = 2 },
@@ -191,6 +218,25 @@ eatState.foodsByItem = {
 	[1] = "Increases experience from kills by 5%",
 	[2] = "Increases experience from kills by 10%",
 	[3] = "Increases experience from kills by 50%",
+}
+eatState.statLinesByItem = {
+	[1] = {
+		"Increases your Agility by 12",
+		"Increases your Strength by 8",
+		"+3 Stamina",
+		"Increases your Spirit by 2",
+		"Use: Restores 59 health and 145 mana over 18 sec and grants 2 Attack Power for 15 min",
+		"+1 Spell Damage",
+		"+2 Healing Power",
+		"+150 Armor",
+		"+1% Critical Strike Chance",
+		"+15% Movement Speed",
+		"+3 Fishing",
+		"+15 Herbalism",
+		"Requires level 30",
+	},
+	[2] = { "+5 Intellect", "Lasts 1 hour" },
+	[3] = { "Increases your Strength by 99" },
 }
 eatState.itemTypes[3] = { 4, 1 }
 eatNs.Scan()
@@ -206,8 +252,8 @@ assert(#eatState.usedItems == 0)
 eatNs.alertFrame.eatDropdownButton.scripts.OnClick()
 assert(eatState.dropdownAnchor == "ForeverSnackTrackAlertEatDropdownButton")
 assert(#eatState.menuEntries == 2)
-assert(eatState.menuEntries[1].text == "Spiced Meat (10%)")
-assert(eatState.menuEntries[2].text == "Roasted Fish (5%) x2")
+assert(eatState.menuEntries[1].text == "Spiced Meat (10%) - +5 Int")
+assert(eatState.menuEntries[2].text == "Roasted Fish (5%) x2 - +8 Str, +12 Agi, +3 Sta, +2 Spi, +2 AP, +1 Spell, +2 Heal, +150 Armor, +1% Crit, +15% Move, +3 Fishing, +15 Herb")
 eatState.items = {
 	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
 	{ bagID = 0, slot = 3, itemID = 3, stackCount = 1 },
@@ -220,6 +266,12 @@ eatState.items = { { bagID = 0, slot = 2, itemID = 2, stackCount = 1 } }
 eatState.menuEntries[2].func()
 assert(eatNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Roasted Fish"
 	and #eatState.usedItems == 0)
+
+local debugNs, debugState = setup()
+debugState.statLinesByItem[1] = { "Increases your Strength by 6" }
+debugNs.DebugStatus()
+local debugFoods = debugNs.GetAvailableFoods()
+assert(#debugFoods == 1 and debugFoods[1].stats[1] == "+6 Str")
 
 local ns
 for _, scale in ipairs({ 0.75, 1, 1.5 }) do

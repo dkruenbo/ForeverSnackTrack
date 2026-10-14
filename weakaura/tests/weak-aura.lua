@@ -2,7 +2,7 @@ local imported = assert(load("return " .. io.read("*a")))()
 local trigger, customText = imported.trigger, imported.text
 local state
 local function reset()
-	state = { now = 100, slots = 1, bagReads = 0, auraReads = 0, chats = 0, classID = 0, subclassID = 5 }
+	state = { now = 100, level = 59, slots = 1, bagReads = 0, auraReads = 0, chats = 0, classID = 0, subclassID = 5 }
 	state.tooltip = { lines = { { leftText = "Food" }, { leftText = "Increases experience from kills by 5%" } } }
 	aura_env = { config = {
 		chatAlerts = true, screenAlerts = true, repeatReminders = true,
@@ -11,6 +11,7 @@ local function reset()
 	} }
 	function IsResting() return state.resting end
 	function UnitAffectingCombat() return state.combat end
+	function UnitLevel(unit) assert(unit == "player"); return state.level end
 	function GetTime() return state.now end
 	function print() state.chats = state.chats + 1 end
 	NUM_BAG_SLOTS = 0
@@ -37,6 +38,21 @@ state.slots, state.hasBuff = 0, true
 assert(trigger("BAG_UPDATE_DELAYED") == false and state.chats == 0 and state.auraReads > 0)
 state.hasBuff = false
 assert(trigger("UNIT_AURA") == true and state.chats == 1)
+
+reset()
+state.level = 60
+assert(trigger("PLAYER_ENTERING_WORLD") == false and state.chats == 0)
+assert(state.bagReads == 0 and state.auraReads == 0)
+reset()
+assert(trigger("PLAYER_ENTERING_WORLD") == true and state.chats == 1)
+local readsAtLevel59 = state.bagReads
+state.level = 60
+assert(trigger("FRAME_UPDATE") == false and state.chats == 1)
+assert(state.bagReads == readsAtLevel59 and state.auraReads == 1)
+assert(aura_env.fefState.reminderKey == nil and aura_env.fefState.screenUntil == nil)
+reset()
+state.level = nil
+assert(trigger("PLAYER_ENTERING_WORLD") == true and state.chats == 1)
 
 for _, tooltip in ipairs({ { lines = {} }, { lines = { { leftText = "Food" } } },
 	{ lines = { { leftText = "Food" }, { leftText = "Retrieving item information" } } } }) do
