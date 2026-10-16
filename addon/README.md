@@ -8,6 +8,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Compares food bonuses with the active `Well Fed` XP buff; an equal or stronger buff suppresses reminders.
 - Sends configurable chat and screen reminders when the active buff is weaker than the best food bonus.
 - Suppresses reminders at level 60, the level cap. Players with XP locked can disable the addon.
+- Hides the on-screen reminder while dead and restores it after resurrection; chat reminders are unaffected.
 - Optionally reminds you when no qualifying food is in your bags.
 - Provides a movable screen alert with custom text, duration, size, and color.
 - Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown, which shows its XP bonus, stack count, and recognized stat bonuses.
@@ -21,9 +22,9 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack-1.0.3.zip](ForeverSnackTrack-1.0.3.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.4.zip](ForeverSnackTrack-1.0.4.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
-3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, or no longer needed. Choose a finite alert duration in the options if preferred.
+3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, hidden while dead, or no longer needed. Choose a finite alert duration in the options if preferred.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
 
 The addon targets interface `16001`. The game client must provide the Retail APIs used by the addon, including item classification through `C_Item.GetItemInfoInstant` or `GetItemInfoInstant`. Missing classification or loading tooltip data is treated as unresolved rather than as proof that no XP food exists.
@@ -36,7 +37,7 @@ Remove the old `Interface/AddOns/ForeverExpFood` folder after installing `Foreve
 
 ## Troubleshooting
 
-If XP food is in your bags but no reminder appears, open `/fst` and check that at least one alert is enabled. Reminders are suppressed during combat, in resting areas by default, while snoozed, or after dismissing the current reminder condition.
+If XP food is in your bags but no reminder appears, open `/fst` and check that at least one alert is enabled. Reminders are suppressed during combat, in resting areas by default, while snoozed, or after dismissing the current reminder condition. The on-screen alert is hidden while dead; chat reminders remain unaffected.
 
 Prefer a WeakAura? See the [WeakAura README](../weakaura/README.md) for its import and options.
 

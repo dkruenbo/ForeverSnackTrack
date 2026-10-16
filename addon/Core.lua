@@ -26,6 +26,7 @@ local reminderState
 local dismissedReminderState
 local snoozeUntil
 local scanTicker
+local auraScanPending = false
 
 local snoozeDurations = { 1, 5, 10, 15, 30, 60 }
 local uppercaseToLowercase = {
@@ -92,6 +93,32 @@ end
 
 local function tooltipLineText(line)
 	return table.concat({ line.leftText or "", line.rightText or "" }, " ")
+end
+
+local function hasItemUseDescription(tooltipData)
+	if type(ITEM_SPELL_TRIGGER_ONUSE) ~= "string" then
+		return false
+	end
+	local prefix = ITEM_SPELL_TRIGGER_ONUSE:match("^(.-)%%") or ITEM_SPELL_TRIGGER_ONUSE
+	prefix = normalizeTooltipText(prefix):match("^%s*(.-)%s*$")
+	if prefix == "" then
+		return false
+	end
+	for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
+		local text = normalizeTooltipText(tooltipLineText(line))
+		if text:sub(1, #prefix) == prefix and text:sub(#prefix + 1):match("%S") then
+			return true
+		end
+	end
+	return false
+end
+
+local function hasLoadedSpellDescription(spellID)
+	if not spellID or not C_Spell or not C_Spell.GetSpellDescription then
+		return false
+	end
+	local description = C_Spell.GetSpellDescription(spellID)
+	return type(description) == "string" and description:match("%S") ~= nil
 end
 
 local function debugPrint(message)
@@ -208,6 +235,10 @@ local function tooltipFoodStats(tooltipData)
 		{ label = "Fishing", fallback = "fishing" },
 		{ label = "Herb", fallback = "herbalism" },
 	}
+	local normalizedLines = {}
+	for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
+		table.insert(normalizedLines, normalizeTooltipText(tooltipLineText(line)))
+	end
 	local bonuses = {}
 	for _, definition in ipairs(definitions) do
 		local terms = {}
@@ -227,8 +258,7 @@ local function tooltipFoodStats(tooltipData)
 			addTerm(alias)
 		end
 		local found = false
-		for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
-			local text = normalizeTooltipText(tooltipLineText(line))
+		for _, text in ipairs(normalizedLines) do
 			for _, term in ipairs(terms) do
 				local first, last = text:find(term, 1, true)
 				if first then
@@ -294,14 +324,19 @@ local function hasQualifyingFood()
 					bonusPercent = nil
 				elseif not isFood then
 					bonusPercent = false
-				elseif bonusPercent == nil or foodStatsCache[itemID] == nil then
+				elseif bonusPercent == nil or (type(bonusPercent) == "number" and foodStatsCache[itemID] == nil) then
 					local tooltipData = C_TooltipInfo and C_TooltipInfo.GetBagItem
 						and C_TooltipInfo.GetBagItem(bagID, slot)
 					if tooltipData and type(tooltipData.lines) == "table" and #tooltipData.lines > 1 then
 						bonusPercent = tooltipExperienceBonusPercent(tooltipData)
-						foodStatsCache[itemID] = tooltipFoodStats(tooltipData)
 						if type(bonusPercent) == "number" then
 							foodTooltipCache[itemID] = bonusPercent
+							foodStatsCache[itemID] = tooltipFoodStats(tooltipData)
+						elseif bonusPercent == false and hasItemUseDescription(tooltipData) then
+							foodTooltipCache[itemID] = false
+						elseif bonusPercent == false then
+							bonusPercent = nil
+							unresolvedTooltip = true
 						elseif bonusPercent == nil then
 							unresolvedTooltip = true
 						end
@@ -349,7 +384,6 @@ local function hasQualifyingFood()
 		return first.itemName < second.itemName
 	end)
 	cachedQualifyingFoods = qualifyingFoods
-
 	if unresolvedTooltip then
 		return bestBonusPercent > 0 and bestBonusPercent or nil
 	end
@@ -367,12 +401,14 @@ local function invalidateBagScan(itemID)
 end
 
 function ns.GetAvailableFoods()
-	invalidateBagScan()
-	hasQualifyingFood()
+	if cachedQualifyingFoods == nil then
+		cachedBagResult = nil
+		hasQualifyingFood()
+	end
 	return cachedQualifyingFoods or {}
 end
 
-local function hasExperienceBuff()
+local function hasExperienceBuff(requiredBonusPercent)
 	if not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex
 		or not C_TooltipInfo or not C_TooltipInfo.GetUnitBuff then
 		return nil
@@ -398,9 +434,12 @@ local function hasExperienceBuff()
 				if #tooltipData.lines == 1 and aura.name and tooltipData.lines[1].leftText == aura.name then
 					bonusPercent = nil
 				end
+				if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId) then
+					bonusPercent = nil
+				end
 				if bonusPercent == nil then
 					unresolvedTooltip = true
-				elseif aura.spellId and type(bonusPercent) == "number" then
+				elseif aura.spellId then
 					auraTooltipCache[aura.spellId] = bonusPercent
 				end
 			else
@@ -410,8 +449,15 @@ local function hasExperienceBuff()
 		if type(bonusPercent) == "number" and bonusPercent > bestBonusPercent then
 			bestBonusPercent = bonusPercent
 		end
+		if requiredBonusPercent and bestBonusPercent >= requiredBonusPercent then
+			return bestBonusPercent
+		end
 		index = index + 1
 	end
+end
+
+local function isPlayerDead()
+	return UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") or false
 end
 
 local function sendReminder(message, useCustomScreenMessage)
@@ -421,6 +467,7 @@ local function sendReminder(message, useCustomScreenMessage)
 		sent = true
 	end
 	if ns.db.screenAlerts and ns.ShowScreenAlert
+		and not isPlayerDead()
 		and not (ns.alertFrame and ns.alertFrame.isPreview and ns.alertFrame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
 		sent = ns.ShowScreenAlert(screenMessage) or sent
@@ -471,6 +518,7 @@ function ns.Scan()
 		foodStatsCache = {}
 		auraTooltipCache = {}
 		cachedBagResult = nil
+		cachedQualifyingFoods = nil
 		tooltipCacheTime = now
 	end
 
@@ -483,7 +531,7 @@ function ns.Scan()
 	local message
 	local useCustomScreenMessage = false
 	if hasFood then
-		local hasBuff = hasExperienceBuff()
+		local hasBuff = hasExperienceBuff(type(hasFood) == "number" and hasFood or nil)
 		if hasBuff == nil then
 			return
 		elseif type(hasBuff) == "number" and hasBuff >= hasFood then
@@ -551,6 +599,7 @@ function ns.Scan()
 	local remaining = lastReminderTime and ns.db.screenDuration > 0
 		and lastReminderTime + ns.db.screenDuration - now
 	if ns.db.screenAlerts and lastReminderTime and ns.ShowScreenAlert
+		and not isPlayerDead()
 		and (ns.db.screenDuration == 0 or remaining > 0)
 		and not (frame and frame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
@@ -634,10 +683,17 @@ function ns.DebugStatus()
 					debugPrint("Item " .. itemID .. ": tooltip data unavailable.")
 				else
 					local bonusPercent = tooltipExperienceBonusPercent(tooltipData)
+					if bonusPercent == false and not hasItemUseDescription(tooltipData) then
+						bonusPercent = nil
+					end
 					if bonusPercent == nil then
 						unresolvedItems = unresolvedItems + 1
 					end
-					foodTooltipCache[itemID] = type(bonusPercent) == "number" and bonusPercent or nil
+					if type(bonusPercent) == "number" or bonusPercent == false then
+						foodTooltipCache[itemID] = bonusPercent
+					else
+						foodTooltipCache[itemID] = nil
+					end
 					local itemName = itemInfo.itemName or (GetItemInfo and GetItemInfo(itemID)) or ("item " .. itemID)
 					if type(bonusPercent) == "number" then
 						recognizedFoods = recognizedFoods + 1
@@ -675,6 +731,7 @@ function ns.DebugStatus()
 	local auraIndex = 1
 	local auraCount = 0
 	local recognizedBuffs = 0
+	local unresolvedBuffs = 0
 	local bestBuffPercent = 0
 	while true do
 		local aura = C_UnitAuras.GetAuraDataByIndex("player", auraIndex, "HELPFUL")
@@ -684,14 +741,25 @@ function ns.DebugStatus()
 		auraCount = auraCount + 1
 		local tooltipData = C_TooltipInfo.GetUnitBuff("player", auraIndex, "HELPFUL")
 		if not tooltipData or type(tooltipData.lines) ~= "table" or #tooltipData.lines == 0 then
+			unresolvedBuffs = unresolvedBuffs + 1
 			debugPrint("Buff " .. (aura.name or tostring(aura.spellId)) .. ": tooltip data unavailable.")
 		else
 			local bonusPercent = tooltipExperienceBonusPercent(tooltipData)
 			if #tooltipData.lines == 1 and tooltipData.lines[1].leftText == aura.name then
 				bonusPercent = nil
 			end
+			if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId) then
+				bonusPercent = nil
+			end
+			if bonusPercent == nil then
+				unresolvedBuffs = unresolvedBuffs + 1
+			end
 			if aura.spellId then
-				auraTooltipCache[aura.spellId] = type(bonusPercent) == "number" and bonusPercent or nil
+				if type(bonusPercent) == "number" or bonusPercent == false then
+					auraTooltipCache[aura.spellId] = bonusPercent
+				else
+					auraTooltipCache[aura.spellId] = nil
+				end
 			end
 			if type(bonusPercent) == "number" then
 				recognizedBuffs = recognizedBuffs + 1
@@ -709,6 +777,9 @@ function ns.DebugStatus()
 		debugPrint(string.format("No XP kill-buff recognized among %d helpful buff(s).", auraCount))
 	else
 		debugPrint(string.format("Recognized %d XP buff(s); strongest active bonus is %d%%.", recognizedBuffs, bestBuffPercent))
+	end
+	if unresolvedBuffs > 0 then
+		debugPrint(string.format("%d buff tooltip(s) unavailable or incomplete.", unresolvedBuffs))
 	end
 end
 
@@ -735,11 +806,30 @@ function ns.DismissReminder()
 end
 
 local eventFrame = CreateFrame("Frame")
+
+local function scheduleAuraScan()
+	if not C_Timer or not C_Timer.After then
+		ns.Scan()
+		return
+	end
+	if auraScanPending then
+		return
+	end
+	auraScanPending = true
+	C_Timer.After(0.5, function()
+		auraScanPending = false
+		ns.Scan()
+	end)
+end
+
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
 eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
+eventFrame:RegisterEvent("PLAYER_DEAD")
+eventFrame:RegisterEvent("PLAYER_ALIVE")
+eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
@@ -783,6 +873,12 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		ns.Scan()
 	elseif event == "PLAYER_LEVEL_UP" then
 		ns.Scan()
+	elseif event == "PLAYER_DEAD" then
+		if ns.HideScreenAlert then
+			ns.HideScreenAlert()
+		end
+	elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
+		ns.Scan()
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
@@ -792,7 +888,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "UNIT_AURA" then
 		if arg1 == "player" then
 			auraTooltipCache = {}
-			ns.Scan()
+			scheduleAuraScan()
 		end
 	elseif event == "GET_ITEM_INFO_RECEIVED" then
 		invalidateBagScan(arg1)

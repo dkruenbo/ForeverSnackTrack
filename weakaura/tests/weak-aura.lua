@@ -1,5 +1,8 @@
 local imported = assert(load("return " .. io.read("*a")))()
-local trigger, customText = imported.trigger, imported.text
+local trigger, customText, events = imported.trigger, imported.text, imported.events
+for _, event in ipairs({ "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
+	assert(events:find(event, 1, true))
+end
 local state
 local function reset()
 	state = { now = 100, level = 59, slots = 1, bagReads = 0, auraReads = 0, chats = 0, classID = 0, subclassID = 5 }
@@ -11,6 +14,7 @@ local function reset()
 	} }
 	function IsResting() return state.resting end
 	function UnitAffectingCombat() return state.combat end
+	function UnitIsDeadOrGhost(unit) assert(unit == "player"); return state.dead end
 	function UnitLevel(unit) assert(unit == "player"); return state.level end
 	function GetTime() return state.now end
 	function print() state.chats = state.chats + 1 end
@@ -32,6 +36,18 @@ local function reset()
 		if state.hasBuff and index == 1 then return { spellId = 1, name = "Well Fed" } end
 	end }
 end
+
+reset()
+assert(trigger("PLAYER_ENTERING_WORLD") == true and state.chats == 1)
+state.now, state.dead = 160, true
+assert(trigger("PLAYER_DEAD") == false and state.chats == 2)
+assert(trigger("FRAME_UPDATE") == false and state.chats == 2)
+state.dead = false
+assert(trigger("PLAYER_ALIVE") == true and state.chats == 2)
+state.dead = true
+assert(trigger("PLAYER_DEAD") == false)
+state.dead = false
+assert(trigger("PLAYER_UNGHOST") == true and state.chats == 2)
 
 reset()
 state.slots, state.hasBuff = 0, true

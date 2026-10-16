@@ -85,34 +85,37 @@ local function createAlertFrame()
 	frame.eatDropdownButton:SetPoint("RIGHT", frame.snoozeButton, "LEFT", -8, 0)
 	frame.eatDropdownButton:SetText("v")
 	frame.eatDropdownButton:SetScript("OnClick", function()
-		if ToggleDropDownMenu then
+		if ToggleDropDownMenu and UIDropDownMenu_Initialize
+			and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
 			ToggleDropDownMenu(1, nil, frame.foodDropdown, "ForeverSnackTrackAlertEatDropdownButton", 0, 0)
 		end
 	end)
 
 	frame.foodDropdown = CreateFrame("Frame", "ForeverSnackTrackAlertFoodDropdown", frame, "UIDropDownMenuTemplate")
-	UIDropDownMenu_Initialize(frame.foodDropdown, function(_, level)
-		if level ~= 1 then
-			return
-		end
-		local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
-		for _, item in ipairs(foods) do
-			local food = item
-			local info = UIDropDownMenu_CreateInfo()
-			info.text = string.format("%s (%d%%)", food.itemName, food.bonusPercent)
-			if food.count > 1 then
-				info.text = info.text .. string.format(" x%d", food.count)
+	if UIDropDownMenu_Initialize and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
+		UIDropDownMenu_Initialize(frame.foodDropdown, function(_, level)
+			if level ~= 1 then
+				return
 			end
-			if #food.stats > 0 then
-				info.text = info.text .. " - " .. table.concat(food.stats, ", ")
+			local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
+			for _, item in ipairs(foods) do
+				local food = item
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = string.format("%s (%d%%)", food.itemName, food.bonusPercent)
+				if food.count > 1 then
+					info.text = info.text .. string.format(" x%d", food.count)
+				end
+				if #food.stats > 0 then
+					info.text = info.text .. " - " .. table.concat(food.stats, ", ")
+				end
+				info.checked = frame.selectedFoodID == food.itemID
+				info.func = function()
+					setEatFood(frame, food.itemID)
+				end
+				UIDropDownMenu_AddButton(info, level)
 			end
-			info.checked = frame.selectedFoodID == food.itemID
-			info.func = function()
-				setEatFood(frame, food.itemID)
-			end
-			UIDropDownMenu_AddButton(info, level)
-		end
-	end)
+		end)
+	end
 
 	frame:SetScript("OnDragStart", function(self)
 		self:StartMoving()

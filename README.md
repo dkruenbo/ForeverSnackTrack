@@ -4,8 +4,8 @@ XP food reminders for WoW Forever. Scans your bags and compares the food's kill-
 
 ## Choose A Version
 
-- [Standalone addon](addon/README.md): chat reminders, a movable alert, snooze/dismiss buttons, level-cap suppression, and localized interface text.
-- [WeakAura](weakaura/README.md): configurable chat and text reminders through ForeverAuras, without installing the standalone addon.
+- [Standalone addon](addon/README.md): chat reminders, a movable alert with Eat and food-selection actions, snooze/dismiss buttons, level-cap suppression, and screen-alert suppression while dead.
+- [WeakAura](weakaura/README.md): configurable chat and text reminders through ForeverAuras, with level-cap and dead-player screen suppression, without installing the standalone addon.
 
 Use one version at a time to avoid duplicate reminders.
 
@@ -37,6 +37,8 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Scans carried bags for items classified as food and drink whose tooltip grants additional experience from kills and extracts its percentage.
 - Compares food bonuses with the active `Well Fed` XP buff; an equal or stronger buff suppresses reminders.
 - Sends configurable chat and screen reminders when the active buff is weaker than the best food bonus.
+- Lets you eat the strongest available XP food from the alert or choose another qualifying food from the dropdown.
+- Hides the on-screen reminder while dead and restores it after resurrection; chat reminders are unaffected.
 - Optionally reminds you when no qualifying food is in your bags.
 - Provides a movable screen alert with custom text, duration, size, and color.
 - Uses a 1-minute repeat interval and unlimited screen-alert duration by default on new installations.
@@ -49,9 +51,9 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [addon/ForeverSnackTrack-1.0.3.zip](addon/ForeverSnackTrack-1.0.3.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [addon/ForeverSnackTrack-1.0.4.zip](addon/ForeverSnackTrack-1.0.4.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
-3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, or no longer needed. Choose a finite alert duration in the options if preferred.
+3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, hidden while dead, or no longer needed. Choose a finite alert duration in the options if preferred.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
 
 The addon targets interface `16001`. The game client must provide the Retail APIs used by the addon, including item classification through `C_Item.GetItemInfoInstant` or `GetItemInfoInstant`. Missing classification or loading tooltip data is treated as unresolved rather than as proof that no XP food exists.
@@ -64,7 +66,7 @@ Remove the old `Interface/AddOns/ForeverExpFood` folder after installing `Foreve
 
 ## Troubleshooting
 
-If XP food is in your bags but no reminder appears, open `/fst` and check that at least one alert is enabled. Reminders are suppressed during combat, in resting areas by default, while snoozed, or after dismissing the current reminder condition.
+If XP food is in your bags but no reminder appears, open `/fst` and check that at least one alert is enabled. Reminders are suppressed during combat, in resting areas by default, while snoozed, or after dismissing the current reminder condition. The on-screen alert is hidden while dead; chat reminders remain unaffected.
 
 The [WeakAura import](weakaura/weak-aura-string.txt) also has a **Remind while resting** toggle in Custom Options, disabled by default. Re-import it to receive this option.
 
@@ -86,7 +88,7 @@ Run `sh weakaura/tests/run-weak-aura.sh` to decode the checked-in WeakAura impor
 - `addon/` contains the addon source, TOC, release ZIP, planning docs, and tests.
 - [Addon changelog](addon/docs/Changelog.md) and [CurseForge description](addon/docs/CURSEFORGE-DESCRIPTION.md) cover the addon only.
 - `weakaura/` contains the import, [WeakAura changelog](weakaura/WA-changelog.md), and its own tests.
-- [addon/ForeverSnackTrack-1.0.3.zip](addon/ForeverSnackTrack-1.0.3.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
+- [addon/ForeverSnackTrack-1.0.4.zip](addon/ForeverSnackTrack-1.0.4.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
 
 ```text
 README.md
@@ -94,7 +96,7 @@ LICENSE
 addon/
 	ForeverSnackTrack.toc
 	Core.lua, Options.lua, ScreenAlert.lua, Locale.lua
-	ForeverSnackTrack-1.0.3.zip
+	ForeverSnackTrack-1.0.4.zip
 	implementation-plan.md
 	docs/
 		Changelog.md
