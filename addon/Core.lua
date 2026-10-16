@@ -99,11 +99,11 @@ local function hasItemUseDescription(tooltipData)
 	if type(ITEM_SPELL_TRIGGER_ONUSE) ~= "string" then
 		return false
 	end
-	local prefix = ITEM_SPELL_TRIGGER_ONUSE:match("^(.-)%%")
-	if not prefix or prefix == "" then
+	local prefix = ITEM_SPELL_TRIGGER_ONUSE:match("^(.-)%%") or ITEM_SPELL_TRIGGER_ONUSE
+	prefix = normalizeTooltipText(prefix):match("^%s*(.-)%s*$")
+	if prefix == "" then
 		return false
 	end
-	prefix = normalizeTooltipText(prefix)
 	for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
 		local text = normalizeTooltipText(tooltipLineText(line))
 		if text:sub(1, #prefix) == prefix and text:sub(#prefix + 1):match("%S") then

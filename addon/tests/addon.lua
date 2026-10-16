@@ -108,7 +108,7 @@ local function setup(settings)
 	STAT_STAMINA, STAT_SPIRIT = "Stamina", "Spirit"
 	NUM_BAG_SLOTS = 0
 	RETRIEVING_ITEM_INFO = "Retrieving item information"
-	ITEM_SPELL_TRIGGER_ONUSE = "Use: %s"
+	ITEM_SPELL_TRIGGER_ONUSE = "Use:"
 	C_Spell = { GetSpellDescription = function(spellID) return state.spellDescriptions[spellID] end }
 	C_Item = { GetItemInfoInstant = function(itemID)
 		local itemType = state.itemTypes[itemID]
@@ -453,6 +453,14 @@ ns.Scan()
 assert(state.chats == 1 and state.bagReads == 1)
 state:event("GET_ITEM_INFO_RECEIVED", 1)
 assert(state.chats == 2 and state.bagReads == 2)
+
+ns, state = setup({ remindWhenNoFood = true })
+ITEM_SPELL_TRIGGER_ONUSE = "Use: %s"
+state.foodTooltips[1] = { lines = {
+	{ leftText = "Bread" }, { leftText = "Food" }, { leftText = "Use: Restores 20 health" },
+} }
+ns.Scan()
+assert(state.chats == 1 and state.bagReads == 1)
 
 ns, state = setup()
 ns.Scan()
