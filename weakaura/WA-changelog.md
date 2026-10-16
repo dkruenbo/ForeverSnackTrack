@@ -1,6 +1,6 @@
 # WeakAura Changelog
 
-## Unreleased
+## 2026-10-16
 
 ### Player-facing
 

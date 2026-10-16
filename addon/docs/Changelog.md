@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.4 - 2026-10-16
 
 ### Player-facing
 
@@ -10,9 +10,9 @@
 ### Technical
 
 - Parse stats only for XP food, reuse available-food results, and coalesce aura-triggered scans while still invalidating buff caches.
-- Cache negative food and buff results only when their item-use or spell descriptions confirm tooltip completeness; otherwise retry.
+- Cache negative food and buff results only when their item-use or spell descriptions confirm tooltip completeness; otherwise retry. Recognize Forever's literal `Use:` marker.
 - Let a known sufficient XP buff resolve the comparison even if another aura tooltip is unresolved.
-- Add English fallback for missing locale keys and guard optional dropdown helpers.
+- Report unresolved buff tooltips in diagnostics, fall back to English for missing locale keys, and guard optional dropdown helpers.
 
 ## 1.0.3 - 2026-10-14
 
