@@ -50,6 +50,7 @@ The TOC loads `Locale.lua`, `ScreenAlert.lua`, `Core.lua`, then `Options.lua`. M
 - Defaults: chat and screen enabled, repeat every minute, unlimited real alert, restock reminders off, **Remind while resting off**. New installations do not open options or require setup.
 - Suppress real reminders during combat and, by default, while `IsResting()` is true. Check again on combat/resting transitions.
 - While dead, hide the on-screen reminder without suppressing chat; check again on `PLAYER_ALIVE` or `PLAYER_UNGHOST` in both implementations.
+- The addon may send a chat-only warning before an XP buff expires. It defaults to a 5-minute lead, 0 disables it, and each buff expiration warns at most once; it respects the chat toggle, snooze, combat, and resting suppression and never shows a screen popup.
 - Chat delivery is rate-limited; screen visibility is separate state. Restoring a hidden eligible alert must not resend chat or reset its repeat timer.
 - Repeat disabled means no extra chat for the same condition merely because combat or resting ended.
 - Restoring an alert must respect snooze, dismissal, current condition, enabled channels, and finite expiry. Do not re-show an expired finite alert on every scan.
@@ -60,8 +61,8 @@ The TOC loads `Locale.lua`, `ScreenAlert.lua`, `Core.lua`, then `Options.lua`. M
 
 ## Saved Preferences And Renaming
 
-- Current global: `ForeverSnackTrackDB`. `ForeverExpFoodDB` is intentional legacy compatibility, not a stale identifier to delete.
-- Existing new settings take precedence over legacy settings; defaults fill missing/invalid fields without resetting valid user preferences.
+- Current per-character variable: `ForeverSnackTrackCharDB`. `ForeverSnackTrackDB` and `ForeverExpFoodDB` are account-wide migration sources; copy their settings into each character's table only when that character has no table yet, and never mutate the sources.
+- Existing per-character settings take precedence over account-wide migration sources; defaults fill missing/invalid fields without resetting valid user preferences. Copy nested tables such as `screenColor` so characters do not share mutable values.
 - WoW saved-variable loading depends on the addon filename. A rename cannot automatically discover an unloaded old saved-variable file.
 - Keep the documented one-time transfer in [addon/README.md](addon/README.md) and prevent users from running both old and new addon folders together.
 
@@ -89,13 +90,13 @@ git diff --check
 
 The WeakAura runner needs Python 3 and Lua; it decodes the checked-in import and runs its Lua tests without changing the import. Addon tests use mocked WoW APIs and also run from inside `addon/` with `lua tests/addon.lua`.
 
-Required regression scenarios: preview open/close and screen toggles with repeats on/off; combat/resting/death transitions without unintended chat changes; snooze/dismiss across transitions; finite expiry; dragging at 75%, 100%, and 150% then changing scale; title-only and multi-line partial tooltips followed by loaded XP descriptions; short complete food/buff descriptions; preservation of known XP-food actions when another item is unresolved; negative food-cache invalidation through `GET_ITEM_INFO_RECEIVED`; cached buff invalidation on `UNIT_AURA`; coalesced aura bursts followed by a later event; a sufficient XP buff alongside an unresolved aura; active buff after consuming the last food; non-food XP items; mixed percentages; and WeakAura throttling/saved positioning.
+Required regression scenarios: preview open/close and screen toggles with repeats on/off; combat/resting/death transitions without unintended chat changes; snooze/dismiss across transitions; finite expiry; buff-expiry warning lead time, one-shot delivery, chat-only behavior, and suppression; dragging at 75%, 100%, and 150% then changing scale; title-only and multi-line partial tooltips followed by loaded XP descriptions; short complete food/buff descriptions; preservation of known XP-food actions when another item is unresolved; negative food-cache invalidation through `GET_ITEM_INFO_RECEIVED`; cached buff invalidation on `UNIT_AURA`; coalesced aura bursts followed by a later event; a sufficient XP buff alongside an unresolved aura; active buff after consuming the last food; non-food XP items; mixed percentages; and WeakAura throttling/saved positioning.
 
 Passing mocks does not certify Forever API availability, food classifications, localized tooltip wording, frame layout, or import/update behavior. Report in-game validation separately. Use `/fst debug` with real food/buff tooltips when investigating detection failures.
 
 ## Release And Collaboration
 
-- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.4`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
+- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.5`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
 - After runtime/TOC changes, rebuild the addon ZIP and name it `ForeverSnackTrack-<version>.zip` using the TOC version; update documented download links to match. Archive entries must be `ForeverSnackTrack/` plus the TOC and four runtime Lua files, not an `addon/` folder.
 - Exclude `.DS_Store`, `__MACOSX`, tests, planning docs, WeakAura files, and repository settings. Verify archive integrity and byte-for-byte source parity.
 - Prefer explicit archive file lists over recursively zipping the workspace. Source files are authoritative; do not edit only the ZIP.

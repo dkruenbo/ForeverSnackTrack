@@ -2,8 +2,9 @@
 ## Title: Forever SnackTrack
 ## Notes: Reminds you when XP food is available and its buff is inactive.
 ## Author: Forever SnackTrack
-## Version: 1.0.4
+## Version: 1.0.5
 ## SavedVariables: ForeverSnackTrackDB, ForeverExpFoodDB
+## SavedVariablesPerCharacter: ForeverSnackTrackCharDB
 
 Locale.lua
 ScreenAlert.lua

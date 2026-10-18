@@ -12,7 +12,9 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 - Requires food-and-drink item classification; unavailable classification, loading placeholders, and title-only food tooltips remain unresolved.
 - If a tooltip line has multiple percentages, selects the one most closely associated with its experience-increase wording.
 - Detects the percentage from the matching "Well fed" XP buff; a buff equal to or stronger than the best food bonus suppresses the reminder.
+- Can send one chat-only warning before a recognized XP buff expires. The lead time is configurable from 0 to 15 minutes and defaults to 5; 0 disables the warning. It respects chat, snooze, combat, and resting settings and never shows a screen popup.
 - Starts reminders with default preferences without opening options or requiring setup; players can customize preferences in the in-game options panel, and closing it triggers a scan.
+- Stores preferences per character; on first load, copies existing account-wide settings into that character's saved variables without modifying the migration source.
 - Provides `/fst debug` to report recognized XP food, active XP buffs, and relevant tooltip candidate lines.
 - Supports chat and screen alerts, each independently toggleable.
 - Lets players customize whether and how often reminders repeat.

@@ -1,6 +1,6 @@
 local addonPath = (arg[0]:match("^(.*[/\\])") or "") .. "../"
 
-local function setup(settings)
+local function setup(settings, accountSettings, legacySettings)
 	local state = {
 		now = 100,
 		level = 59,
@@ -18,9 +18,11 @@ local function setup(settings)
 		menuEntries = {},
 		dropdownAnchor = nil,
 		pendingTimers = {},
+		expiryTimer = nil,
 		bagReads = 0,
 		buffReads = 0,
 		auraReads = 0,
+		auraExpirationTime = nil,
 		foodTooltips = {},
 		buffTooltips = {},
 		spellDescriptions = {},
@@ -72,8 +74,11 @@ local function setup(settings)
 	UIParent = object()
 	SlashCmdList = {}
 	C_Timer = { After = function(delay, callback)
-		assert(delay == 0.5)
-		table.insert(state.pendingTimers, callback)
+		if delay == 0.5 then
+			table.insert(state.pendingTimers, callback)
+		else
+			state.expiryTimer = { delay = delay, callback = callback }
+		end
 	end }
 	if settings and settings.missingDropdownApis then
 		UIDropDownMenu_SetSelectedValue, UIDropDownMenu_SetWidth = nil, nil
@@ -169,13 +174,16 @@ local function setup(settings)
 	C_UnitAuras = { GetAuraDataByIndex = function(_, index)
 		state.auraReads = state.auraReads + 1
 		if state.auras then return state.auras[index] end
-		if index == 1 and state.buff then return { spellId = 1, name = "Well Fed" } end
+		if index == 1 and state.buff then
+			return { spellId = 1, name = "Well Fed", expirationTime = state.auraExpirationTime }
+		end
 	end }
 	DEFAULT_CHAT_FRAME = { AddMessage = function(_, message)
 		state.chats = state.chats + 1
 		table.insert(state.messages, message)
 	end }
-	ForeverSnackTrackDB, ForeverExpFoodDB = settings or {}, nil
+	ForeverSnackTrackCharDB = settings
+	ForeverSnackTrackDB, ForeverExpFoodDB = accountSettings, legacySettings
 	local ns = {}
 	assert(loadfile(addonPath .. "Locale.lua"))()
 	for _, path in ipairs({ "ScreenAlert.lua", "Core.lua", "Options.lua" }) do
@@ -189,9 +197,33 @@ local function setup(settings)
 		self.pendingTimers = {}
 		for _, callback in ipairs(pendingTimers) do callback() end
 	end
+	function state:runExpiryTimer()
+		local timer = self.expiryTimer
+		assert(timer)
+		self.expiryTimer = nil
+		self.now = self.now + timer.delay
+		timer.callback()
+	end
 	state:event("ADDON_LOADED", "ForeverSnackTrack")
 	return ns, state
 end
+
+local accountColor = { r = 0.2, g = 0.3, b = 0.4 }
+local accountSettings = { chatAlerts = false, reminderMinutes = 4, screenColor = accountColor }
+local migratedNs = setup(nil, accountSettings)
+assert(not migratedNs.db.chatAlerts and migratedNs.db.reminderMinutes == 4)
+migratedNs.db.screenColor.r = 0.9
+assert(accountColor.r == 0.2 and ForeverSnackTrackDB == accountSettings)
+local firstCharacterSettings = migratedNs.db
+local secondCharacterNs = setup(nil, accountSettings)
+secondCharacterNs.db.chatAlerts = true
+assert(not firstCharacterSettings.chatAlerts and not accountSettings.chatAlerts)
+
+local legacyNs = setup(nil, nil, { chatAlerts = false, reminderMinutes = 7 })
+assert(not legacyNs.db.chatAlerts and legacyNs.db.reminderMinutes == 7)
+
+local characterNs = setup({ chatAlerts = true }, { chatAlerts = false })
+assert(characterNs.db.chatAlerts)
 
 for _, repeatReminders in ipairs({ false, true }) do
 	local ns, state = setup({ repeatReminders = repeatReminders })
@@ -564,4 +596,104 @@ local germanChatOption = ForeverSnackTrackL.chatOption
 ForeverSnackTrackLocales.deDE.noFoodOption = nil
 assert(germanChatOption == "Chatnachricht")
 assert(ForeverSnackTrackL.noFoodOption == ForeverSnackTrackLocales.enUS.noFoodOption)
+
+ns, state = setup()
+assert(ns.db.buffExpiryWarningMinutes == 5)
+ns.optionsPanel.buffExpirySlider:SetValue(1)
+assert(ns.db.buffExpiryWarningMinutes == 1)
+ns.optionsPanel.buffExpirySlider:SetValue(5)
+assert(ns.optionsPanel.buffExpirySlider.scripts.OnMouseUp)
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 220
+ns.Scan()
+assert(state.chats == 1 and state.messages[1]:find("expires in about 2 min", 1, true))
+assert(not ns.alertFrame)
+ns.Scan()
+assert(state.chats == 1)
+state.auraExpirationTime = 500
+state.now = 160
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(state.chats == 1)
+state.now = 220
+ns.Scan()
+assert(state.chats == 2 and state.messages[2]:find("expires in about 5 min", 1, true))
+
+ns, state = setup()
+state.auras = {
+	{ spellId = 1, name = "Timed XP", expirationTime = 220 },
+	{ spellId = 2, name = "Permanent XP", expirationTime = 0 },
+}
+state.buffTooltips[1] = { lines = { { leftText = "Timed XP" }, { leftText = "Increases experience from kills by 5%" } } }
+state.buffTooltips[2] = { lines = { { leftText = "Permanent XP" }, { leftText = "Increases experience from kills by 5%" } } }
+ns.Scan()
+assert(state.chats == 0)
+
+ns, state = setup({ buffExpiryWarningMinutes = 0 })
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 400
+ns.Scan()
+assert(state.chats == 0)
+ns.optionsPanel.buffExpirySlider:SetValue(5)
+ns.optionsPanel.buffExpirySlider.scripts.OnMouseUp()
+assert(state.chats == 1 and state.messages[1]:find("expires in about 5 min", 1, true))
+
+ns, state = setup({ buffExpiryWarningMinutes = 0 })
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 200
+ns.Scan()
+assert(state.chats == 0)
+
+ns, state = setup({ buffExpiryWarningMinutes = 1 })
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 220
+ns.Scan()
+assert(state.chats == 0 and state.expiryTimer and state.expiryTimer.delay == 60)
+state:runExpiryTimer()
+assert(state.chats == 1 and state.messages[1]:find("expires in about 1 min", 1, true))
+
+ns, state = setup()
+ns.SnoozeReminders()
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 220
+ns.Scan()
+assert(state.chats == 0)
+state.now = 160
+ns.Scan()
+assert(state.chats == 1)
+
+ns, state = setup()
+state.combat = true
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 220
+ns.Scan()
+assert(state.chats == 0)
+state.combat = false
+state:event("PLAYER_REGEN_ENABLED")
+assert(state.chats == 1)
+
+ns, state = setup({ chatAlerts = false, screenAlerts = true })
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 200
+ns.Scan()
+assert(state.chats == 0 and not ns.alertFrame)
+
+ns, state = setup({ screenAlerts = false })
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 200
+ns.Scan()
+assert(state.chats == 1 and not ns.alertFrame)
+
+ns, state = setup()
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = 220
+ns.DebugStatus()
+local foundBuffExpiry = false
+for _, message in ipairs(state.messages) do
+	if message:find("expires in 2 min", 1, true) then
+		foundBuffExpiry = true
+		break
+	end
+end
+assert(foundBuffExpiry)
 print("PASS: addon alert state, food actions, finite expiry, suppression, scaled positioning, classification and tooltip retries")
