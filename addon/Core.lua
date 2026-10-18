@@ -124,6 +124,21 @@ local function hasLoadedSpellDescription(spellID)
 	return type(description) == "string" and description:match("%S") ~= nil
 end
 
+local function hasBuffTooltipDescription(tooltipData, aura)
+	local auraName = normalizeTooltipText(aura and aura.name or ""):match("^%s*(.-)%s*$")
+	for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
+		local rawText = tooltipLineText(line)
+		if RETRIEVING_ITEM_INFO and rawText:find(RETRIEVING_ITEM_INFO, 1, true) then
+			return false
+		end
+		local text = normalizeTooltipText(rawText):match("^%s*(.-)%s*$")
+		if text ~= "" and text ~= auraName then
+			return true
+		end
+	end
+	return false
+end
+
 local function debugPrint(message)
 	if DEFAULT_CHAT_FRAME then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack debug:|r " .. message)
@@ -466,7 +481,8 @@ local function hasExperienceBuff(requiredBonusPercent)
 				if #tooltipData.lines == 1 and aura.name and tooltipData.lines[1].leftText == aura.name then
 					bonusPercent = nil
 				end
-				if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId) then
+				if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId)
+					and not hasBuffTooltipDescription(tooltipData, aura) then
 					bonusPercent = nil
 				end
 				if bonusPercent == nil then
@@ -837,7 +853,8 @@ function ns.DebugStatus()
 			if #tooltipData.lines == 1 and tooltipData.lines[1].leftText == aura.name then
 				bonusPercent = nil
 			end
-			if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId) then
+			if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId)
+				and not hasBuffTooltipDescription(tooltipData, aura) then
 				bonusPercent = nil
 			end
 			if bonusPercent == nil then

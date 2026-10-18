@@ -377,9 +377,7 @@ debugNegativeNs.GetAvailableFoods()
 assert(debugNegativeState.bagReads == 1)
 local debugBuffNs, debugBuffState = setup()
 debugBuffState.buff = "Well Fed"
-debugBuffState.buffTooltips[1] = { lines = {
-	{ leftText = "Well Fed" }, { leftText = "Aura type" },
-} }
+debugBuffState.buffTooltips[1] = { lines = { { leftText = "Well Fed" } } }
 debugBuffNs.DebugStatus()
 local foundUnresolvedBuffCount = false
 for _, message in ipairs(debugBuffState.messages) do
@@ -448,7 +446,7 @@ assert(#ns.GetAvailableFoods() == 1)
 
 ns, state = setup()
 state.buff = "Well Fed"
-state.buffTooltips[1] = { lines = { { leftText = "Well Fed" }, { leftText = "Binds when picked up" } } }
+state.buffTooltips[1] = { lines = { { leftText = "Well Fed" } } }
 ns.Scan()
 assert(state.chats == 0 and state.buffReads == 1)
 state.buffTooltips[1] = { lines = {
@@ -464,12 +462,25 @@ state.auras = {
 	{ spellId = 2, name = "Kill XP" },
 }
 state.buffTooltips[1] = { lines = { { leftText = "Unresolved aura" }, { leftText = "Aura type" } } }
+state.buffTooltips[1] = { lines = { { leftText = "Unresolved aura" } } }
 state.spellDescriptions[1] = ""
 state.buffTooltips[2] = { lines = {
 	{ leftText = "Kill XP" }, { leftText = "Increases experience from kills by 10%" },
 } }
 ns.Scan()
 assert(state.chats == 0 and (not ns.alertFrame or not ns.alertFrame:IsShown()))
+
+ns, state = setup()
+state.buff = "Campfire Nearby"
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Campfire Nearby" },
+	{ leftText = "The pleasant smoke of a campfire drifts in the air from somewhere nearby." },
+} }
+state.spellDescriptions[1] = ""
+ns.Scan()
+assert(state.chats == 1 and ns.alertFrame:IsShown() and state.buffReads == 1)
+ns.Scan()
+assert(state.chats == 1 and state.buffReads == 1)
 
 ns, state = setup({ remindWhenNoFood = true })
 state.foodTooltips[1] = { lines = {
