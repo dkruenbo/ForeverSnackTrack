@@ -4,7 +4,7 @@ XP food reminders for WoW Forever. Scans your bags and compares the food's kill-
 
 ## Choose A Version
 
-- [Standalone addon](addon/README.md): chat reminders, a movable alert with Eat and food-selection actions, snooze/dismiss buttons, level-cap suppression, and screen-alert suppression while dead.
+- [Standalone addon](addon/README.md): chat reminders, a configurable XP-buff expiry warning, a movable Eat alert, snooze/dismiss buttons, level-cap suppression, and screen-alert suppression while dead.
 - [WeakAura](weakaura/README.md): configurable chat and text reminders through ForeverAuras, with level-cap and dead-player screen suppression, without installing the standalone addon.
 
 Use one version at a time to avoid duplicate reminders.
@@ -37,6 +37,8 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Scans carried bags for items classified as food and drink whose tooltip grants additional experience from kills and extracts its percentage.
 - Compares food bonuses with the active `Well Fed` XP buff; an equal or stronger buff suppresses reminders.
 - Sends configurable chat and screen reminders when the active buff is weaker than the best food bonus.
+- Sends a chat-only warning before an XP buff expires; the lead time defaults to 5 minutes and can be disabled in the options.
+- Stores preferences per character, migrating existing account-wide settings the first time each character loads the update.
 - Lets you eat the strongest available XP food from the alert or choose another qualifying food from the dropdown.
 - Hides the on-screen reminder while dead and restores it after resurrection; chat reminders are unaffected.
 - Optionally reminds you when no qualifying food is in your bags.
@@ -51,9 +53,9 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [addon/ForeverSnackTrack-1.0.4.zip](addon/ForeverSnackTrack-1.0.4.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [addon/ForeverSnackTrack-1.0.5.zip](addon/ForeverSnackTrack-1.0.5.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
-3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, hidden while dead, or no longer needed. Choose a finite alert duration in the options if preferred.
+3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
 
 The addon targets interface `16001`. The game client must provide the Retail APIs used by the addon, including item classification through `C_Item.GetItemInfoInstant` or `GetItemInfoInstant`. Missing classification or loading tooltip data is treated as unresolved rather than as proof that no XP food exists.
@@ -88,7 +90,7 @@ Run `sh weakaura/tests/run-weak-aura.sh` to decode the checked-in WeakAura impor
 - `addon/` contains the addon source, TOC, release ZIP, planning docs, and tests.
 - [Addon changelog](addon/docs/Changelog.md) and [CurseForge description](addon/docs/CURSEFORGE-DESCRIPTION.md) cover the addon only.
 - `weakaura/` contains the import, [WeakAura changelog](weakaura/WA-changelog.md), and its own tests.
-- [addon/ForeverSnackTrack-1.0.4.zip](addon/ForeverSnackTrack-1.0.4.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
+- [addon/ForeverSnackTrack-1.0.5.zip](addon/ForeverSnackTrack-1.0.5.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
 
 ```text
 README.md
@@ -96,7 +98,7 @@ LICENSE
 addon/
 	ForeverSnackTrack.toc
 	Core.lua, Options.lua, ScreenAlert.lua, Locale.lua
-	ForeverSnackTrack-1.0.4.zip
+	ForeverSnackTrack-1.0.5.zip
 	implementation-plan.md
 	docs/
 		Changelog.md

@@ -7,6 +7,7 @@ local defaults = {
 	remindWhileResting = false,
 	repeatReminders = true,
 	reminderMinutes = 1,
+	buffExpiryWarningMinutes = 5,
 	snoozeMinutes = 1,
 	screenMessage = "",
 	screenDuration = 0,
@@ -27,6 +28,8 @@ local dismissedReminderState
 local snoozeUntil
 local scanTicker
 local auraScanPending = false
+local lastBuffExpiryWarningKey
+local buffExpiryScanKey
 
 local snoozeDurations = { 1, 5, 10, 15, 30, 60 }
 local uppercaseToLowercase = {
@@ -121,51 +124,92 @@ local function hasLoadedSpellDescription(spellID)
 	return type(description) == "string" and description:match("%S") ~= nil
 end
 
+local function hasBuffTooltipDescription(tooltipData, aura)
+	local auraName = normalizeTooltipText(aura and aura.name or ""):match("^%s*(.-)%s*$")
+	for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
+		local rawText = tooltipLineText(line)
+		if RETRIEVING_ITEM_INFO and rawText:find(RETRIEVING_ITEM_INFO, 1, true) then
+			return false
+		end
+		local text = normalizeTooltipText(rawText):match("^%s*(.-)%s*$")
+		if text ~= "" and text ~= auraName then
+			return true
+		end
+	end
+	return false
+end
+
 local function debugPrint(message)
 	if DEFAULT_CHAT_FRAME then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack debug:|r " .. message)
 	end
 end
 
+local function copySettings(source)
+	local settings = {}
+	if type(source) ~= "table" then
+		return settings
+	end
+	for key, value in pairs(source) do
+		settings[key] = value
+	end
+	if type(settings.screenColor) == "table" then
+		local color = settings.screenColor
+		settings.screenColor = { r = color.r, g = color.g, b = color.b }
+	end
+	return settings
+end
+
 local function initializeSettings()
-	if type(ForeverSnackTrackDB) ~= "table" then
-		ForeverSnackTrackDB = type(ForeverExpFoodDB) == "table" and ForeverExpFoodDB or {}
+	if type(ForeverSnackTrackCharDB) ~= "table" then
+		local previousSettings = type(ForeverSnackTrackDB) == "table"
+			and ForeverSnackTrackDB or ForeverExpFoodDB
+		ForeverSnackTrackCharDB = copySettings(previousSettings)
 	end
 
 	for key, value in pairs(defaults) do
-		if type(ForeverSnackTrackDB[key]) ~= type(value) then
-			ForeverSnackTrackDB[key] = value
+		if type(ForeverSnackTrackCharDB[key]) ~= type(value) then
+			ForeverSnackTrackCharDB[key] = value
 		end
 	end
 
-	ForeverSnackTrackDB.reminderMinutes = math.max(1, math.min(60, math.floor(ForeverSnackTrackDB.reminderMinutes)))
+	ForeverSnackTrackCharDB.reminderMinutes = math.max(1,
+		math.min(60, math.floor(ForeverSnackTrackCharDB.reminderMinutes)))
+	local buffExpiryWarningMinutes = ForeverSnackTrackCharDB.buffExpiryWarningMinutes
+	if type(buffExpiryWarningMinutes) ~= "number" or buffExpiryWarningMinutes ~= buffExpiryWarningMinutes then
+		buffExpiryWarningMinutes = defaults.buffExpiryWarningMinutes
+	end
+	ForeverSnackTrackCharDB.buffExpiryWarningMinutes = math.max(0,
+		math.min(15, math.floor(buffExpiryWarningMinutes + 0.5)))
 	local validSnoozeDuration = false
 	for _, minutes in ipairs(snoozeDurations) do
-		if ForeverSnackTrackDB.snoozeMinutes == minutes then
+		if ForeverSnackTrackCharDB.snoozeMinutes == minutes then
 			validSnoozeDuration = true
 			break
 		end
 	end
 	if not validSnoozeDuration then
-		ForeverSnackTrackDB.snoozeMinutes = defaults.snoozeMinutes
+		ForeverSnackTrackCharDB.snoozeMinutes = defaults.snoozeMinutes
 	end
-	if ForeverSnackTrackDB.screenDuration ~= 0 then
-		ForeverSnackTrackDB.screenDuration = math.max(1, math.min(20, math.floor(ForeverSnackTrackDB.screenDuration)))
+	if ForeverSnackTrackCharDB.screenDuration ~= 0 then
+		ForeverSnackTrackCharDB.screenDuration = math.max(1, math.min(20,
+			math.floor(ForeverSnackTrackCharDB.screenDuration)))
 	end
-	ForeverSnackTrackDB.screenScale = math.max(0.75, math.min(1.5, ForeverSnackTrackDB.screenScale))
-	if type(ForeverSnackTrackDB.screenColor) ~= "table" then
-		ForeverSnackTrackDB.screenColor = { r = 1, g = 0.82, b = 0 }
+	ForeverSnackTrackCharDB.screenScale = math.max(0.75,
+		math.min(1.5, ForeverSnackTrackCharDB.screenScale))
+	if type(ForeverSnackTrackCharDB.screenColor) ~= "table" then
+		ForeverSnackTrackCharDB.screenColor = { r = 1, g = 0.82, b = 0 }
 	else
 		for _, channel in ipairs({ "r", "g", "b" }) do
-			local value = ForeverSnackTrackDB.screenColor[channel]
+			local value = ForeverSnackTrackCharDB.screenColor[channel]
 			if type(value) ~= "number" or value ~= value then
-				ForeverSnackTrackDB.screenColor[channel] = channel == "r" and 1 or channel == "g" and 0.82 or 0
+				ForeverSnackTrackCharDB.screenColor[channel] = channel == "r" and 1 or channel == "g" and 0.82 or 0
 			else
-				ForeverSnackTrackDB.screenColor[channel] = math.max(0, math.min(1, value))
+				ForeverSnackTrackCharDB.screenColor[channel] = math.max(0, math.min(1, value))
 			end
 		end
 	end
-	ns.db = ForeverSnackTrackDB
+	ns.db = ForeverSnackTrackCharDB
 end
 
 local function tooltipExperienceBonusPercent(tooltipData)
@@ -417,13 +461,16 @@ local function hasExperienceBuff(requiredBonusPercent)
 	local index = 1
 	local unresolvedTooltip = false
 	local bestBonusPercent = 0
+	local bestExpirationTime
+	local bestSpellID
 	while true do
 		local aura = C_UnitAuras.GetAuraDataByIndex("player", index, "HELPFUL")
 		if not aura then
-			if unresolvedTooltip then
-				return nil
+			local knownBonusPercent = bestBonusPercent > 0 and bestBonusPercent or nil
+			if unresolvedTooltip and not (requiredBonusPercent and bestBonusPercent >= requiredBonusPercent) then
+				return nil, bestExpirationTime, bestSpellID, knownBonusPercent
 			end
-			return bestBonusPercent > 0 and bestBonusPercent or false
+			return knownBonusPercent or false, bestExpirationTime, bestSpellID, knownBonusPercent
 		end
 
 		local bonusPercent = aura.spellId and auraTooltipCache[aura.spellId]
@@ -434,7 +481,8 @@ local function hasExperienceBuff(requiredBonusPercent)
 				if #tooltipData.lines == 1 and aura.name and tooltipData.lines[1].leftText == aura.name then
 					bonusPercent = nil
 				end
-				if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId) then
+				if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId)
+					and not hasBuffTooltipDescription(tooltipData, aura) then
 					bonusPercent = nil
 				end
 				if bonusPercent == nil then
@@ -448,9 +496,20 @@ local function hasExperienceBuff(requiredBonusPercent)
 		end
 		if type(bonusPercent) == "number" and bonusPercent > bestBonusPercent then
 			bestBonusPercent = bonusPercent
-		end
-		if requiredBonusPercent and bestBonusPercent >= requiredBonusPercent then
-			return bestBonusPercent
+			bestExpirationTime = aura.expirationTime
+			bestSpellID = aura.spellId
+		elseif type(bonusPercent) == "number" and bonusPercent == bestBonusPercent then
+			local expirationTime = aura.expirationTime
+			if type(expirationTime) ~= "number" or type(bestExpirationTime) ~= "number" then
+				bestExpirationTime = nil
+				bestSpellID = nil
+			elseif expirationTime <= 0 or bestExpirationTime <= 0 then
+				bestExpirationTime = 0
+				bestSpellID = aura.spellId
+			elseif expirationTime > bestExpirationTime then
+				bestExpirationTime = expirationTime
+				bestSpellID = aura.spellId
+			end
 		end
 		index = index + 1
 	end
@@ -458,6 +517,47 @@ end
 
 local function isPlayerDead()
 	return UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") or false
+end
+
+local function warnAboutBuffExpiry(bonusPercent, expirationTime, spellID, now)
+	local warningMinutes = ns.db.buffExpiryWarningMinutes
+	if warningMinutes <= 0 or not ns.db.chatAlerts or not DEFAULT_CHAT_FRAME
+		or type(bonusPercent) ~= "number" or type(expirationTime) ~= "number" or expirationTime <= 0 then
+		buffExpiryScanKey = nil
+		if type(bonusPercent) ~= "number" or type(expirationTime) ~= "number" or expirationTime <= 0 then
+			lastBuffExpiryWarningKey = nil
+		end
+		return
+	end
+	if snoozeUntil and now < snoozeUntil then
+		return
+	end
+	local remaining = expirationTime - now
+	if remaining <= 0 then
+		lastBuffExpiryWarningKey = nil
+		return
+	end
+	local expiryKey = tostring(spellID or "unknown") .. ":" .. tostring(expirationTime)
+	if remaining > warningMinutes * 60 then
+		local scheduledKey = expiryKey .. ":" .. tostring(warningMinutes)
+		if C_Timer and C_Timer.After and buffExpiryScanKey ~= scheduledKey then
+			buffExpiryScanKey = scheduledKey
+			C_Timer.After(remaining - warningMinutes * 60, function()
+				if buffExpiryScanKey == scheduledKey then
+					buffExpiryScanKey = nil
+					ns.Scan()
+				end
+			end)
+		end
+		return
+	end
+	buffExpiryScanKey = nil
+	if expiryKey == lastBuffExpiryWarningKey then
+		return
+	end
+	lastBuffExpiryWarningKey = expiryKey
+	DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack:|r " .. string.format(
+		ForeverSnackTrackL.buffExpiryMessage, bonusPercent, math.ceil(remaining / 60)))
 end
 
 local function sendReminder(message, useCustomScreenMessage)
@@ -523,6 +623,13 @@ function ns.Scan()
 	end
 
 	local hasFood = hasQualifyingFood()
+	local requiredBonusPercent = type(hasFood) == "number" and hasFood or nil
+	local hasBuff, buffExpirationTime, buffSpellID, knownBuffPercent
+	if hasFood or ns.db.remindWhenNoFood or ns.db.buffExpiryWarningMinutes > 0 then
+		hasBuff, buffExpirationTime, buffSpellID, knownBuffPercent = hasExperienceBuff(requiredBonusPercent)
+	end
+	warnAboutBuffExpiry(knownBuffPercent or (type(hasBuff) == "number" and hasBuff),
+		buffExpirationTime, buffSpellID, now)
 	if hasFood == nil then
 		return
 	end
@@ -531,7 +638,6 @@ function ns.Scan()
 	local message
 	local useCustomScreenMessage = false
 	if hasFood then
-		local hasBuff = hasExperienceBuff(type(hasFood) == "number" and hasFood or nil)
 		if hasBuff == nil then
 			return
 		elseif type(hasBuff) == "number" and hasBuff >= hasFood then
@@ -547,7 +653,6 @@ function ns.Scan()
 		message = string.format(ForeverSnackTrackL.chatMessage, hasFood)
 		useCustomScreenMessage = true
 	elseif ns.db.remindWhenNoFood then
-		local hasBuff = hasExperienceBuff()
 		if hasBuff == nil then
 			return
 		elseif type(hasBuff) == "number" and hasBuff > 0 then
@@ -748,7 +853,8 @@ function ns.DebugStatus()
 			if #tooltipData.lines == 1 and tooltipData.lines[1].leftText == aura.name then
 				bonusPercent = nil
 			end
-			if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId) then
+			if bonusPercent == false and not hasLoadedSpellDescription(aura.spellId)
+				and not hasBuffTooltipDescription(tooltipData, aura) then
 				bonusPercent = nil
 			end
 			if bonusPercent == nil then
@@ -764,7 +870,11 @@ function ns.DebugStatus()
 			if type(bonusPercent) == "number" then
 				recognizedBuffs = recognizedBuffs + 1
 				bestBuffPercent = math.max(bestBuffPercent, bonusPercent)
-				debugPrint(string.format("Buff: %s (spell %s) -> %d%% kill XP", aura.name or "unknown", aura.spellId or "unknown", bonusPercent))
+				local expiryText = type(aura.expirationTime) == "number" and aura.expirationTime > 0
+					and string.format("expires in %d min", math.ceil((aura.expirationTime - now) / 60))
+					or "expiry unavailable"
+				debugPrint(string.format("Buff: %s (spell %s) -> %d%% kill XP; %s",
+					aura.name or "unknown", aura.spellId or "unknown", bonusPercent, expiryText))
 			else
 				for _, candidate in ipairs(debugTooltipCandidates(tooltipData)) do
 					debugPrint(string.format("Buff candidate %s (spell %s): %s", aura.name or "unknown", aura.spellId or "unknown", candidate))

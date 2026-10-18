@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.5 - 2026-10-18
+
+### Player-facing
+
+- Send a chat-only warning before the active XP buff expires; set the lead time from 0 to 15 minutes.
+- Keep addon options independently per character while carrying forward existing account-wide preferences.
+
+### Technical
+
+- Track XP-buff expiration times and send at most one warning per expiration; the lead defaults to 5 minutes and 0 disables it.
+- Accept loaded buff-tooltip body text as a complete non-XP result when the spell-description API is empty; keep title-only and loading tooltips unresolved.
+- Store preferences in `ForeverSnackTrackCharDB`, copying current or legacy account-wide settings once for each character.
+
 ## 1.0.4 - 2026-10-16
 
 ### Player-facing

@@ -21,6 +21,7 @@ local function refreshOptions()
 	panel.repeatCheckbox:SetChecked(ns.db.repeatReminders)
 	panel.intervalSlider:SetValue(ns.db.reminderMinutes)
 	panel.intervalSlider:SetEnabled(ns.db.repeatReminders)
+	panel.buffExpirySlider:SetValue(ns.db.buffExpiryWarningMinutes)
 	if UIDropDownMenu_SetSelectedValue then
 		UIDropDownMenu_SetSelectedValue(panel.snoozeDropdown, ns.db.snoozeMinutes)
 	end
@@ -104,6 +105,25 @@ function ns.InitializeOptions()
 		intervalLabel:SetText(string.format(L.interval, minutes))
 	end)
 
+	local buffExpiryLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	buffExpiryLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -330)
+	buffExpiryLabel:SetText(string.format(L.buffExpiryWarning, ns.db.buffExpiryWarningMinutes))
+
+	panel.buffExpirySlider = CreateFrame("Slider", "ForeverSnackTrackBuffExpirySlider", panel, "OptionsSliderTemplate")
+	panel.buffExpirySlider:SetPoint("TOPLEFT", buffExpiryLabel, "BOTTOMLEFT", 0, -12)
+	panel.buffExpirySlider:SetMinMaxValues(0, 15)
+	panel.buffExpirySlider:SetValueStep(1)
+	panel.buffExpirySlider:SetObeyStepOnDrag(true)
+	panel.buffExpirySlider:SetWidth(260)
+	panel.buffExpirySlider:SetScript("OnValueChanged", function(_, value)
+		local minutes = math.floor(value + 0.5)
+		ns.db.buffExpiryWarningMinutes = minutes
+		buffExpiryLabel:SetText(string.format(L.buffExpiryWarning, minutes))
+	end)
+	panel.buffExpirySlider:SetScript("OnMouseUp", function()
+		ns.Scan()
+	end)
+
 	local snoozeLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	snoozeLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -265)
 	snoozeLabel:SetText(L.snoozeOption)
@@ -134,7 +154,7 @@ function ns.InitializeOptions()
 	end
 
 	local messageLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	messageLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -330)
+	messageLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -390)
 	messageLabel:SetText(L.screenMessageLabel)
 
 	local messageHint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
