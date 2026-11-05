@@ -59,6 +59,7 @@ The TOC loads `Locale.lua`, `ScreenAlert.lua`, `Core.lua`, then `Options.lua`. M
 - Do not overwrite a positioning preview with a real alert during ordinary scans. Closing preview should restore an eligible real alert.
 - Snooze pauses both channels; dismissal applies to the current reminder condition until it changes or resolves.
 - Save addon offsets in UIParent coordinates. Convert using `frame:GetEffectiveScale() / UIParent:GetEffectiveScale()` when anchoring and dragging; re-anchor after scale changes.
+- Reminder scale supports 25%-150%. Popup/icon mode and scale are per-character settings; mode changes preserve reminder timing and visibility. Icon mode uses a fixed food texture, left-click Eat, right-click food/snooze/dismiss menu, and a hover tooltip. Preview icons must not eat or offer reminder actions.
 
 ## Saved Preferences And Renaming
 
@@ -97,7 +98,7 @@ Passing mocks does not certify Forever API availability, food classifications, l
 
 ## Release And Collaboration
 
-- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.5`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
+- [addon/ForeverSnackTrack.toc](addon/ForeverSnackTrack.toc) is the version source; currently `1.0.6`. Keep the release version and addon changelog consistent. Keep unreleased changes marked unreleased until actually released.
 - After runtime/TOC changes, rebuild the addon ZIP and name it `ForeverSnackTrack-<version>.zip` using the TOC version; update documented download links to match. Archive entries must be `ForeverSnackTrack/` plus the TOC and four runtime Lua files, not an `addon/` folder.
 - Exclude `.DS_Store`, `__MACOSX`, tests, planning docs, WeakAura files, and repository settings. Verify archive integrity and byte-for-byte source parity.
 - Prefer explicit archive file lists over recursively zipping the workspace. Source files are authoritative; do not edit only the ZIP.

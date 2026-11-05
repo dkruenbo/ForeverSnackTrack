@@ -4,6 +4,7 @@ Forever SnackTrack reminds you to use the XP food in your bags. It reads the kil
 - A chat-only warning before the XP buff expires, with a configurable lead time.
 - Eat the strongest available XP food from the alert, or choose another qualifying food from a dropdown showing XP and recognized stat bonuses.
 - Custom alert text, color, size, duration, and repeat interval.
+- Reminder size down to 25%, or a compact fixed icon with food information on hover and eating/action controls.
 - Snooze reminders or dismiss the current alert.
 - Optional reminders to restock when you're out of XP food.
 - No reminders during combat. Resting areas are quiet by default, too.

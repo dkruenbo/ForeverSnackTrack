@@ -12,6 +12,7 @@ local defaults = {
 	screenMessage = "",
 	screenDuration = 0,
 	screenScale = 1,
+	screenIconMode = false,
 	alertOffsetX = 0,
 	alertOffsetY = 120,
 }
@@ -195,7 +196,7 @@ local function initializeSettings()
 		ForeverSnackTrackCharDB.screenDuration = math.max(1, math.min(20,
 			math.floor(ForeverSnackTrackCharDB.screenDuration)))
 	end
-	ForeverSnackTrackCharDB.screenScale = math.max(0.75,
+	ForeverSnackTrackCharDB.screenScale = math.max(0.25,
 		math.min(1.5, ForeverSnackTrackCharDB.screenScale))
 	if type(ForeverSnackTrackCharDB.screenColor) ~= "table" then
 		ForeverSnackTrackCharDB.screenColor = { r = 1, g = 0.82, b = 0 }

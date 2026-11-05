@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.6 - 2026-11-05
+
+### Player-facing
+
+- Reduce the reminder size to 25% in options; the size is saved per character.
+- Optionally replace the popup with a fixed food icon. Hover for reminder and selected-food details, left-click to eat, and right-click for food selection, snooze, and dismiss.
+
+### Technical
+
+- Share reminder visibility, expiration, and saved position between popup and icon modes without changing chat timing.
+- Keep icon previews non-actionable and disable eating when no qualifying food is available.
+
 ## 1.0.5 - 2026-10-18
 
 ### Player-facing

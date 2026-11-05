@@ -35,9 +35,11 @@ local function setup(settings, accountSettings, legacySettings)
 		end })
 	end
 	function methods:SetScript(event, callback) self.scripts[event] = callback end
+	function methods:GetScript(event) return self.scripts[event] end
 	function methods:SetSize(width, height) self.size = { width, height } end
 	function methods:CreateFontString() return object() end
 	function methods:CreateTexture() return object() end
+	function methods:SetTexture(texture) self.texture = texture end
 	function methods:SetText(text) self.textValue = text end
 	function methods:GetText() return rawget(self, "textValue") or "" end
 	function methods:SetChecked(value) self.checked = value end
@@ -48,6 +50,7 @@ local function setup(settings, accountSettings, legacySettings)
 	function methods:Show() self.shown = true end
 	function methods:Hide() self.shown = false end
 	function methods:IsShown() return self.shown end
+	function methods:SetShown(shown) self.shown = not not shown end
 	function methods:SetScale(scale) self.scale = scale end
 	function methods:SetFrameLevel(level) self.frameLevel = level end
 	function methods:GetFrameLevel() return rawget(self, "frameLevel") or 0 end
@@ -72,6 +75,13 @@ local function setup(settings, accountSettings, legacySettings)
 		return frame
 	end
 	UIParent = object()
+	GameTooltip = { lines = {}, shown = false }
+	function GameTooltip:SetOwner(owner) self.owner = owner end
+	function GameTooltip:IsOwned(owner) return self.owner == owner end
+	function GameTooltip:SetText(text) self.lines = { text } end
+	function GameTooltip:AddLine(text) table.insert(self.lines, text) end
+	function GameTooltip:Show() self.shown = true end
+	function GameTooltip:Hide() self.shown = false end
 	SlashCmdList = {}
 	C_Timer = { After = function(delay, callback)
 		if delay == 0.5 then
@@ -389,7 +399,7 @@ end
 assert(foundUnresolvedBuffCount)
 
 local ns
-for _, scale in ipairs({ 0.75, 1, 1.5 }) do
+for _, scale in ipairs({ 0.25, 0.5, 0.75, 1, 1.5 }) do
 	ns = setup({ screenScale = scale })
 	ns.Scan()
 	UIParent.centerX, UIParent.centerY = 960, 540
@@ -707,4 +717,101 @@ for _, message in ipairs(state.messages) do
 	end
 end
 assert(foundBuffExpiry)
+
+for _, iconMode in ipairs({ false, true }) do
+	ns, state = setup({ screenScale = 0.25, screenIconMode = iconMode, repeatReminders = false })
+	state.itemNames[1] = "Longjaw Mud Snapper"
+	state.statLinesByItem[1] = { "+5 Strength" }
+	ns.Scan()
+	local frame = ns.alertFrame
+	assert(ns.db.screenScale == 0.25 and frame.scale == 0.25)
+	assert(frame.size[1] == (iconMode and 48 or 460))
+	assert(frame.size[2] == (iconMode and 48 or 128))
+	assert(frame.text:IsShown() ~= iconMode and frame.iconTexture:IsShown() == iconMode)
+	assert(frame.eatButton:GetAttribute("type1") == "macro")
+	assert(frame.eatButton:GetAttribute("type2") == "none")
+	assert(frame.iconTexture.texture == "Interface\\Icons\\INV_Misc_Food_15")
+	if iconMode then
+		frame.eatButton.scripts.OnEnter()
+		assert(GameTooltip.shown)
+		assert(table.concat(GameTooltip.lines, " "):find("Longjaw Mud Snapper (5%) x1", 1, true))
+		assert(table.concat(GameTooltip.lines, " "):find("+5 Str", 1, true))
+		frame.eatButton.scripts.OnLeave()
+		assert(not GameTooltip.shown)
+		frame.eatButton.scripts.PostClick(frame.eatButton, "RightButton")
+		assert(#state.menuEntries == 3 and state.dropdownAnchor == "ForeverSnackTrackAlertEatButton")
+		state.menuEntries[2].func()
+		assert(not frame:IsShown())
+		state.now = 160
+		ns.Scan()
+		assert(frame:IsShown() and state.chats == 2)
+		state.combat = true
+		state:event("PLAYER_REGEN_DISABLED")
+		assert(not frame:IsShown())
+		state.combat = false
+		state:event("PLAYER_REGEN_ENABLED")
+		assert(frame:IsShown() and state.chats == 2)
+		state.resting = true
+		state:event("PLAYER_UPDATE_RESTING")
+		assert(not frame:IsShown())
+		state.resting = false
+		state:event("PLAYER_UPDATE_RESTING")
+		assert(frame:IsShown() and state.chats == 2)
+		frame.centerX, frame.centerY = 400, 200
+		frame.eatButton.scripts.OnDragStart()
+		frame.eatButton.scripts.OnDragStop()
+		assert(ns.db.alertOffsetX == 100 and ns.db.alertOffsetY == 50)
+		state.dead = true
+		state:event("PLAYER_DEAD")
+		assert(not frame:IsShown())
+		state.dead = false
+		state:event("PLAYER_ALIVE")
+		assert(frame:IsShown() and state.chats == 2)
+		frame.eatButton.scripts.PostClick(frame.eatButton, "RightButton")
+		state.menuEntries[3].func()
+		ns.Scan()
+		assert(not frame:IsShown())
+	end
+	ns.optionsPanel.previewButton.scripts.OnClick()
+	assert(frame.isPreview and frame:IsShown())
+	assert(frame.eatButton:GetAttribute("type1") == nil)
+	assert(not frame.snoozeButton:IsShown() and not frame.eatDropdownButton:IsShown())
+	if iconMode then
+		state.menuEntries = {}
+		frame.eatButton.scripts.PostClick(frame.eatButton, "RightButton")
+		assert(#state.menuEntries == 0)
+	end
+end
+
+ns, state = setup({ screenDuration = 5, repeatReminders = false })
+ns.Scan()
+local modeCheckbox = ns.optionsPanel.iconCheckbox
+modeCheckbox:SetChecked(true)
+modeCheckbox.scripts.OnClick(modeCheckbox)
+assert(ns.db.screenIconMode and ns.alertFrame.remaining == 5 and state.chats == 1)
+ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 2)
+ns.optionsPanel.scaleSlider:SetValue(25)
+assert(ns.alertFrame.remaining == 3 and ns.db.screenScale == 0.25 and state.chats == 1)
+modeCheckbox:SetChecked(false)
+modeCheckbox.scripts.OnClick(modeCheckbox)
+assert(ns.alertFrame.remaining == 3 and ns.alertFrame.size[1] == 460)
+state.now = 106
+ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 4)
+modeCheckbox:SetChecked(true)
+modeCheckbox.scripts.OnClick(modeCheckbox)
+ns.Scan()
+assert(not ns.alertFrame:IsShown() and state.chats == 1)
+local savedSettings = ns.db
+local savedNs = setup(savedSettings)
+assert(savedNs.db.screenScale == 0.25 and savedNs.db.screenIconMode)
+savedNs.db.screenIconMode = true
+local savedIconNs = setup(savedNs.db)
+assert(savedIconNs.db.screenIconMode and savedIconNs.db.screenScale == 0.25)
+
+ns, state = setup({ screenIconMode = true, remindWhenNoFood = true })
+state.empty = true
+ns.Scan()
+assert(ns.alertFrame.eatButton:IsShown() and ns.alertFrame.eatButton:GetAttribute("type1") == nil)
+ns.alertFrame.eatButton.scripts.PostClick(ns.alertFrame.eatButton, "RightButton")
+assert(#state.menuEntries == 2)
 print("PASS: addon alert state, food actions, finite expiry, suppression, scaled positioning, classification and tooltip retries")

@@ -43,6 +43,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Hides the on-screen reminder while dead and restores it after resurrection; chat reminders are unaffected.
 - Optionally reminds you when no qualifying food is in your bags.
 - Provides a movable screen alert with custom text, duration, size, and color.
+- Supports 25%-150% saved reminder size and an optional fixed icon with food details on hover, left-click eating, and a right-click action menu.
 - Uses a 1-minute repeat interval and unlimited screen-alert duration by default on new installations.
 - Starts with default preferences without opening options; closing options checks reminders again.
 - Supports snoozing reminders or dismissing the current reminder condition.
@@ -53,7 +54,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [addon/ForeverSnackTrack-1.0.5.zip](addon/ForeverSnackTrack-1.0.5.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [addon/ForeverSnackTrack-1.0.6.zip](addon/ForeverSnackTrack-1.0.6.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat or resting, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
@@ -90,7 +91,7 @@ Run `sh weakaura/tests/run-weak-aura.sh` to decode the checked-in WeakAura impor
 - `addon/` contains the addon source, TOC, release ZIP, planning docs, and tests.
 - [Addon changelog](addon/docs/Changelog.md) and [CurseForge description](addon/docs/CURSEFORGE-DESCRIPTION.md) cover the addon only.
 - `weakaura/` contains the import, [WeakAura changelog](weakaura/WA-changelog.md), and its own tests.
-- [addon/ForeverSnackTrack-1.0.5.zip](addon/ForeverSnackTrack-1.0.5.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
+- [addon/ForeverSnackTrack-1.0.6.zip](addon/ForeverSnackTrack-1.0.6.zip) contains only the installable addon files, not documentation, the WeakAura, or tests.
 
 ```text
 README.md
@@ -98,7 +99,7 @@ LICENSE
 addon/
 	ForeverSnackTrack.toc
 	Core.lua, Options.lua, ScreenAlert.lua, Locale.lua
-	ForeverSnackTrack-1.0.5.zip
+	ForeverSnackTrack-1.0.6.zip
 	implementation-plan.md
 	docs/
 		Changelog.md
