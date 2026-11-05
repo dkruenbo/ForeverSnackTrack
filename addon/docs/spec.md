@@ -20,6 +20,8 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 - Lets players customize whether and how often reminders repeat.
 - Offers an opt-in reminder when no qualifying XP food is in the player's bags and the XP buff is inactive; this option is off by default.
 - Lets players customize the screen alert text, display duration, text color, and size.
+- Allows reminder scale from 25% to 150%, saved per character, and offers a saved icon mode while retaining popup mode as the default. The fixed 48-unit food icon displays reminder and selected-food information on hover; left-click eats, right-click offers food selection, snooze, and dismissal. Dragging uses the existing UIParent-coordinate position persistence.
+- Mode and scale changes do not restart alert duration, resend chat, or change suppression rules. Icon previews cannot eat, snooze, or dismiss; no-food icons have no Eat action.
 - Offers 1-20 second screen-alert durations and an Unlimited choice at the rightmost slider position; unlimited alerts have no timeout, while previews remain timed.
 - Lets players preview and move the screen alert, with its position saved between sessions and a reset option.
 - Stores alert offsets in UIParent coordinates so dragging and changing scale do not move the saved screen position.

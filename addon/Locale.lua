@@ -8,6 +8,7 @@ ForeverSnackTrackLocales = {
 		buffExpiryWarning = "XP buff warning lead time: %d minutes (0 to disable)",
 		buffExpiryMessage = "Your %d%% kill XP buff expires in about %d min.",
 		screenOption = "Screen alert",
+		screenIconOption = "Icon instead of popup",
 		screenMessageLabel = "Custom screen message",
 		screenMessageHint = "Leave blank to use the default localized alert message.",
 		screenDuration = "Alert duration: %d seconds",
