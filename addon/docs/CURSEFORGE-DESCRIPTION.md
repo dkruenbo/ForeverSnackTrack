@@ -4,11 +4,12 @@ Forever SnackTrack reminds you to use the XP food in your bags. It reads the kil
 - A chat-only warning before the XP buff expires, with a configurable lead time.
 - Eat the strongest available XP food from the alert, or choose another qualifying food from a dropdown showing XP and recognized stat bonuses.
 - Custom alert text, color, size, duration, and repeat interval.
-- Reminder size down to 25%, or a compact fixed icon with food information on hover and eating/action controls.
+- Reminder size down to 25%, or a compact fixed icon with a bright gold glow, food information on hover, and eating/action controls.
+- Highlights qualifying XP food in open bags while a popup or icon reminder is visible.
 - Snooze reminders or dismiss the current alert.
 - Optional reminders to restock when you're out of XP food.
 - No reminders during combat. Resting areas are quiet by default, too.
-- At level 60, reminders stop. The on-screen alert also hides while dead and returns after resurrection.
+- At level 60, reminders stop. The on-screen alert hides while dead or flying and returns after resurrection or landing; chat reminders continue normally.
 
 Works without setup. Open `/snacktrack` or `/fst` to change your preferences.
 

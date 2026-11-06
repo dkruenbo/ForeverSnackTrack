@@ -520,6 +520,28 @@ local function isPlayerDead()
 	return UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") or false
 end
 
+local flightSuppressed = false
+local flightTicker
+
+local function isPlayerFlying()
+	return IsFlying and IsFlying() or false
+end
+
+local function updateFlightSuppression()
+	if not ns.db then
+		return
+	end
+	if isPlayerFlying() then
+		flightSuppressed = true
+		if ns.HideScreenAlert then
+			ns.HideScreenAlert()
+		end
+	elseif flightSuppressed then
+		flightSuppressed = false
+		ns.Scan()
+	end
+end
+
 local function warnAboutBuffExpiry(bonusPercent, expirationTime, spellID, now)
 	local warningMinutes = ns.db.buffExpiryWarningMinutes
 	if warningMinutes <= 0 or not ns.db.chatAlerts or not DEFAULT_CHAT_FRAME
@@ -569,6 +591,7 @@ local function sendReminder(message, useCustomScreenMessage)
 	end
 	if ns.db.screenAlerts and ns.ShowScreenAlert
 		and not isPlayerDead()
+		and not isPlayerFlying()
 		and not (ns.alertFrame and ns.alertFrame.isPreview and ns.alertFrame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
 		sent = ns.ShowScreenAlert(screenMessage) or sent
@@ -706,6 +729,7 @@ function ns.Scan()
 		and lastReminderTime + ns.db.screenDuration - now
 	if ns.db.screenAlerts and lastReminderTime and ns.ShowScreenAlert
 		and not isPlayerDead()
+		and not isPlayerFlying()
 		and (ns.db.screenDuration == 0 or remaining > 0)
 		and not (frame and frame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
@@ -938,11 +962,15 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
 eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
+eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+eventFrame:RegisterEvent("PLAYER_STOPPED_MOVING")
 eventFrame:RegisterEvent("PLAYER_DEAD")
 eventFrame:RegisterEvent("PLAYER_ALIVE")
 eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+eventFrame:RegisterEvent("BAG_OPEN")
+eventFrame:RegisterEvent("BAG_CLOSED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 if eventFrame.RegisterUnitEvent then
@@ -965,10 +993,17 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		invalidateBagScan()
 		if C_Timer and C_Timer.NewTicker then
 			scanTicker = C_Timer.NewTicker(60, ns.Scan)
+			flightTicker = C_Timer.NewTicker(0.25, updateFlightSuppression)
 		else
 			local elapsedSinceScan = 0
+			local elapsedSinceFlightCheck = 0
 			eventFrame:SetScript("OnUpdate", function(_, elapsed)
 				elapsedSinceScan = elapsedSinceScan + elapsed
+				elapsedSinceFlightCheck = elapsedSinceFlightCheck + elapsed
+				if elapsedSinceFlightCheck >= 0.25 then
+					elapsedSinceFlightCheck = elapsedSinceFlightCheck % 0.25
+					updateFlightSuppression()
+				end
 				if elapsedSinceScan >= 60 then
 					elapsedSinceScan = elapsedSinceScan % 60
 					ns.Scan()
@@ -979,9 +1014,18 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "BAG_UPDATE_DELAYED" then
 		invalidateBagScan()
 		ns.Scan()
+		if ns.RefreshBagHighlights then
+			ns.RefreshBagHighlights()
+		end
+	elseif event == "BAG_OPEN" or event == "BAG_CLOSED" then
+		if ns.RefreshBagHighlights then
+			ns.RefreshBagHighlights()
+		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		invalidateBagScan()
 		ns.Scan()
+	elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "PLAYER_STOPPED_MOVING" then
+		updateFlightSuppression()
 	elseif event == "PLAYER_LEVEL_UP" then
 		ns.Scan()
 	elseif event == "PLAYER_DEAD" then
