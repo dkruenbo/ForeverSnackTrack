@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.7 - 2026-11-06
+
+### Player-facing
+
+- Add a bright gold glow to the fixed reminder icon.
+- Highlight qualifying XP food in open bags while a popup or icon reminder is visible.
+- Hide the screen reminder while flying and restore it after landing; chat reminders continue normally.
+
+### Technical
+
+- Match bag-slot highlights against recognized XP-food item IDs and clear them when the alert hides or the item no longer qualifies.
+- Support unnamed bag buttons and bag/slot methods, and refresh highlights after bag layouts populate.
+- Integrate EllesmereUI bag windows and its item-overlay API, drawing highlights on its item overlay layer when available.
+- Check flight state during active reminders so screen alerts are suppressed and restored without changing chat timing.
+
 ## 1.0.6 - 2026-11-05
 
 ### Player-facing

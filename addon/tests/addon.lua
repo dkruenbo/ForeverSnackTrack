@@ -4,6 +4,7 @@ local function setup(settings, accountSettings, legacySettings)
 	local state = {
 		now = 100,
 		level = 59,
+		flying = false,
 		chats = 0,
 		messages = {},
 		food = "Increases experience from kills by 5%",
@@ -18,6 +19,7 @@ local function setup(settings, accountSettings, legacySettings)
 		menuEntries = {},
 		dropdownAnchor = nil,
 		pendingTimers = {},
+		tickers = {},
 		expiryTimer = nil,
 		bagReads = 0,
 		buffReads = 0,
@@ -38,8 +40,18 @@ local function setup(settings, accountSettings, legacySettings)
 	function methods:GetScript(event) return self.scripts[event] end
 	function methods:SetSize(width, height) self.size = { width, height } end
 	function methods:CreateFontString() return object() end
-	function methods:CreateTexture() return object() end
+	function methods:CreateTexture()
+		local texture = object()
+		local textures = rawget(self, "textures")
+		if not textures then
+			textures = {}
+			rawset(self, "textures", textures)
+		end
+		table.insert(textures, texture)
+		return texture
+	end
 	function methods:SetTexture(texture) self.texture = texture end
+	function methods:SetVertexColor(...) self.vertexColor = { ... } end
 	function methods:SetText(text) self.textValue = text end
 	function methods:GetText() return rawget(self, "textValue") or "" end
 	function methods:SetChecked(value) self.checked = value end
@@ -56,6 +68,8 @@ local function setup(settings, accountSettings, legacySettings)
 	function methods:GetFrameLevel() return rawget(self, "frameLevel") or 0 end
 	function methods:GetEffectiveScale() return rawget(self, "scale") or 1 end
 	function methods:GetCenter() return rawget(self, "centerX") or 0, rawget(self, "centerY") or 0 end
+	function methods:GetID() return rawget(self, "id") end
+	function methods:GetParent() return rawget(self, "parent") end
 	function methods:SetPoint(...) self.point = { ... } end
 	function methods:EnableMouse(enabled) self.mouseEnabled = enabled end
 	function methods:RegisterForClicks(...) self.registeredClicks = { ... } end
@@ -89,6 +103,10 @@ local function setup(settings, accountSettings, legacySettings)
 		else
 			state.expiryTimer = { delay = delay, callback = callback }
 		end
+	end, NewTicker = function(interval, callback)
+		local ticker = { interval = interval, callback = callback }
+		table.insert(state.tickers, ticker)
+		return ticker
 	end }
 	if settings and settings.missingDropdownApis then
 		UIDropDownMenu_SetSelectedValue, UIDropDownMenu_SetWidth = nil, nil
@@ -113,6 +131,7 @@ local function setup(settings, accountSettings, legacySettings)
 	end
 	function GetLocale() return settings and settings.locale or "enUS" end
 	function IsResting() return state.resting end
+	function IsFlying() return state.flying end
 	function UnitAffectingCombat() return state.combat end
 	function UnitIsDeadOrGhost(unit)
 		assert(unit == "player")
@@ -206,6 +225,13 @@ local function setup(settings, accountSettings, legacySettings)
 		local pendingTimers = self.pendingTimers
 		self.pendingTimers = {}
 		for _, callback in ipairs(pendingTimers) do callback() end
+	end
+	function state:runTicker(interval)
+		for _, ticker in ipairs(self.tickers) do
+			if ticker.interval == interval then
+				ticker.callback()
+			end
+		end
 	end
 	function state:runExpiryTimer()
 		local timer = self.expiryTimer
@@ -807,6 +833,121 @@ assert(savedNs.db.screenScale == 0.25 and savedNs.db.screenIconMode)
 savedNs.db.screenIconMode = true
 local savedIconNs = setup(savedNs.db)
 assert(savedIconNs.db.screenIconMode and savedIconNs.db.screenScale == 0.25)
+
+ns, state = setup({ repeatReminders = false })
+ns.Scan()
+local flightFrame = ns.alertFrame
+state:event("PLAYER_LOGIN")
+state.flying = true
+state:runTicker(0.25)
+assert(not flightFrame:IsShown() and state.chats == 1)
+ns.Scan()
+assert(not flightFrame:IsShown() and state.chats == 1)
+state.flying = false
+state:runTicker(0.25)
+assert(flightFrame:IsShown() and state.chats == 1)
+
+ns, state = setup({ screenIconMode = true, screenDuration = 5 })
+state.items = {
+	{ bagID = 0, slot = 1, itemID = 1, stackCount = 1 },
+	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
+}
+state.itemTypes[2] = { 2, 1 }
+ns.Scan()
+local addonEventFrame = state.eventFrame
+local foodBagParent = CreateFrame("Frame")
+foodBagParent.id = 0
+local foodBagButton = CreateFrame("Button")
+foodBagButton.id = 1
+foodBagButton.parent = foodBagParent
+foodBagButton:Show()
+local otherBagButton = CreateFrame("Button")
+otherBagButton.id = 2
+otherBagButton.parent = foodBagParent
+otherBagButton:Show()
+state.eventFrame = addonEventFrame
+ContainerFrame1Item1 = foodBagButton
+ContainerFrame1Item2 = otherBagButton
+state:event("BAG_OPEN")
+assert(ns.alertFrame.iconGlow:IsShown())
+assert(foodBagButton.textures[1] and foodBagButton.textures[1]:IsShown())
+local otherTextures = rawget(otherBagButton, "textures")
+assert(not otherTextures or not otherTextures[1])
+ns.db.screenIconMode = false
+ns.RefreshAlertMode()
+assert(not ns.alertFrame.iconGlow:IsShown())
+ns.db.screenIconMode = true
+ns.RefreshAlertMode()
+assert(ns.alertFrame.iconGlow:IsShown())
+assert(ns.alertFrame.iconGlow.vertexColor[4] == 1)
+assert(foodBagButton.textures[1].vertexColor[4] == 1)
+ContainerFrame1Item1 = nil
+ContainerFrame1Item2 = nil
+foodBagParent.GetChildren = function() return end
+ContainerFrameCombinedBags = foodBagParent
+ns.RefreshBagHighlights()
+assert(not foodBagButton.textures[1]:IsShown())
+foodBagButton.id = 99
+foodBagButton.GetBagID = function() return 0 end
+foodBagButton.GetSlotID = function() return 1 end
+foodBagParent.GetChildren = function() return foodBagButton end
+ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 0.25)
+assert(foodBagButton.textures[1]:IsShown())
+assert(state.chats == 1)
+ns.ShowScreenAlert("Preview", true)
+assert(not foodBagButton.textures[1]:IsShown())
+ns.ShowScreenAlert("Reminder")
+assert(foodBagButton.textures[1]:IsShown())
+state.empty = true
+state:event("BAG_UPDATE_DELAYED")
+assert(not ns.alertFrame:IsShown())
+assert(not foodBagButton.textures[1]:IsShown())
+ContainerFrame1Item1 = nil
+ContainerFrame1Item2 = nil
+ContainerFrameCombinedBags = nil
+
+ns, state = setup({ screenIconMode = true, screenDuration = 5 })
+local ellesmereEventFrame = state.eventFrame
+local ellesmereBag = CreateFrame("Frame")
+ellesmereBag.id = 0
+local ellesmereButton = CreateFrame("Button")
+ellesmereButton.id = 1
+ellesmereButton.parent = ellesmereBag
+ellesmereButton.GetBagID = function() return nil end
+ellesmereButton.GetSlotID = function() return nil end
+ellesmereButton.IsObjectType = function(_, kind) return kind == "Button" end
+ellesmereButton.GetChildren = false
+ellesmereButton._textOverlay = CreateFrame("Frame")
+ellesmereBag.GetChildren = function() return ellesmereButton end
+state.eventFrame = ellesmereEventFrame
+EUI_MainBagFrame = ellesmereBag
+local overlayCallback
+EUI_Bags = { RegisterItemOverlayIcon = function(name, callback)
+	assert(name == "ForeverSnackTrack")
+	overlayCallback = callback
+end }
+ns.Scan()
+assert(type(overlayCallback) == "function")
+local ellesmereGlow = ellesmereButton._textOverlay.textures[1]
+assert(ellesmereGlow:IsShown())
+overlayCallback(ellesmereButton, { bag = 0, slot = 0 })
+assert(not ellesmereGlow:IsShown())
+overlayCallback(ellesmereButton, { bag = -1, slot = 1 })
+assert(not ellesmereGlow:IsShown())
+overlayCallback(ellesmereButton, { bag = 0, slot = 1 })
+assert(ellesmereGlow:IsShown())
+state.items[1].itemID = 2
+state.itemTypes[2] = { 2, 1 }
+overlayCallback(ellesmereButton, { bag = 0, slot = 1 })
+assert(not ellesmereGlow:IsShown())
+state.items[1].itemID = 1
+ns.RefreshBagHighlights()
+assert(ellesmereGlow:IsShown())
+ns.HideScreenAlert()
+assert(not ellesmereGlow:IsShown())
+overlayCallback(ellesmereButton, { bag = 0, slot = 1 })
+assert(not ellesmereGlow:IsShown())
+EUI_MainBagFrame, EUI_Bags = nil, nil
 
 ns, state = setup({ screenIconMode = true, remindWhenNoFood = true })
 state.empty = true
