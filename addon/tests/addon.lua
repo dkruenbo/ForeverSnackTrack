@@ -51,7 +51,9 @@ local function setup(settings, accountSettings, legacySettings)
 		return texture
 	end
 	function methods:SetTexture(texture) self.texture = texture end
+	function methods:SetTexCoord(...) self.texCoord = { ... } end
 	function methods:SetVertexColor(...) self.vertexColor = { ... } end
+	function methods:SetAlpha(alpha) self.alpha = alpha end
 	function methods:SetText(text) self.textValue = text end
 	function methods:GetText() return rawget(self, "textValue") or "" end
 	function methods:SetChecked(value) self.checked = value end
@@ -64,6 +66,7 @@ local function setup(settings, accountSettings, legacySettings)
 	function methods:IsShown() return self.shown end
 	function methods:SetShown(shown) self.shown = not not shown end
 	function methods:SetScale(scale) self.scale = scale end
+	function methods:SetFrameStrata(strata) self.strata = strata end
 	function methods:SetFrameLevel(level) self.frameLevel = level end
 	function methods:GetFrameLevel() return rawget(self, "frameLevel") or 0 end
 	function methods:GetEffectiveScale() return rawget(self, "scale") or 1 end
@@ -848,106 +851,48 @@ state:runTicker(0.25)
 assert(flightFrame:IsShown() and state.chats == 1)
 
 ns, state = setup({ screenIconMode = true, screenDuration = 5 })
-state.items = {
-	{ bagID = 0, slot = 1, itemID = 1, stackCount = 1 },
-	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
-}
-state.itemTypes[2] = { 2, 1 }
+local originalHook = hooksecurefunc
+local originalItemUpdate = ContainerFrameItemButton_Update
+hooksecurefunc = function() error("Alert must not hook bag item buttons") end
+ContainerFrameItemButton_Update = function() end
+EUI_Bags = { RegisterItemOverlayIcon = function() error("Alert must not register bag overlays") end }
 ns.Scan()
-local addonEventFrame = state.eventFrame
-local foodBagParent = CreateFrame("Frame")
-foodBagParent.id = 0
-local foodBagButton = CreateFrame("Button")
-foodBagButton.id = 1
-foodBagButton.parent = foodBagParent
-foodBagButton:Show()
-local otherBagButton = CreateFrame("Button")
-otherBagButton.id = 2
-otherBagButton.parent = foodBagParent
-otherBagButton:Show()
-state.eventFrame = addonEventFrame
-ContainerFrame1Item1 = foodBagButton
-ContainerFrame1Item2 = otherBagButton
-state:event("BAG_OPEN")
 assert(ns.alertFrame.iconGlow:IsShown())
-assert(foodBagButton.textures[1] and foodBagButton.textures[1]:IsShown())
-local otherTextures = rawget(otherBagButton, "textures")
-assert(not otherTextures or not otherTextures[1])
+assert(ns.alertFrame.strata == "LOW" and ns.alertFrame:GetFrameLevel() == 1)
+assert(ns.alertFrame.iconGlow.vertexColor[4] == 1)
+local glow = ns.alertFrame.iconGlow
+assert(glow.texCoord[1] == 0.15 and glow.texCoord[2] == 0.85)
+assert(glow.texCoord[3] == 0.15 and glow.texCoord[4] == 0.85)
+assert(glow.point[4] > 0 and glow.point[5] < 0)
+local originalPairs = pairs
+local originalItemInfo = C_Container.GetContainerItemInfo
+pairs = function(value)
+	assert(value ~= _G, "Alert updates must not scan global UI frames")
+	return originalPairs(value)
+end
+C_Container.GetContainerItemInfo = function() error("Alert updates must not read bag items") end
+ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 0.6)
+assert(math.abs(ns.alertFrame.iconGlow.alpha - 0.25) < 0.001)
+ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 0.6)
+assert(math.abs(ns.alertFrame.iconGlow.alpha - 1) < 0.001)
+for tick = 1, 120 do
+	ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 1 / 60)
+end
+assert(state.chats == 1)
 ns.db.screenIconMode = false
 ns.RefreshAlertMode()
 assert(not ns.alertFrame.iconGlow:IsShown())
-ns.db.screenIconMode = true
-ns.RefreshAlertMode()
-assert(ns.alertFrame.iconGlow:IsShown())
-assert(ns.alertFrame.iconGlow.vertexColor[4] == 1)
-assert(foodBagButton.textures[1].vertexColor[4] == 1)
-ContainerFrame1Item1 = nil
-ContainerFrame1Item2 = nil
-foodBagParent.GetChildren = function() return end
-ContainerFrameCombinedBags = foodBagParent
-ns.RefreshBagHighlights()
-assert(not foodBagButton.textures[1]:IsShown())
-foodBagButton.id = 99
-foodBagButton.GetBagID = function() return 0 end
-foodBagButton.GetSlotID = function() return 1 end
-foodBagParent.GetChildren = function() return foodBagButton end
-ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 0.25)
-assert(foodBagButton.textures[1]:IsShown())
-assert(state.chats == 1)
-ns.ShowScreenAlert("Preview", true)
-assert(not foodBagButton.textures[1]:IsShown())
-ns.ShowScreenAlert("Reminder")
-assert(foodBagButton.textures[1]:IsShown())
-state.empty = true
-state:event("BAG_UPDATE_DELAYED")
-assert(not ns.alertFrame:IsShown())
-assert(not foodBagButton.textures[1]:IsShown())
-ContainerFrame1Item1 = nil
-ContainerFrame1Item2 = nil
-ContainerFrameCombinedBags = nil
-
-ns, state = setup({ screenIconMode = true, screenDuration = 5 })
-local ellesmereEventFrame = state.eventFrame
-local ellesmereBag = CreateFrame("Frame")
-ellesmereBag.id = 0
-local ellesmereButton = CreateFrame("Button")
-ellesmereButton.id = 1
-ellesmereButton.parent = ellesmereBag
-ellesmereButton.GetBagID = function() return nil end
-ellesmereButton.GetSlotID = function() return nil end
-ellesmereButton.IsObjectType = function(_, kind) return kind == "Button" end
-ellesmereButton.GetChildren = false
-ellesmereButton._textOverlay = CreateFrame("Frame")
-ellesmereBag.GetChildren = function() return ellesmereButton end
-state.eventFrame = ellesmereEventFrame
-EUI_MainBagFrame = ellesmereBag
-local overlayCallback
-EUI_Bags = { RegisterItemOverlayIcon = function(name, callback)
-	assert(name == "ForeverSnackTrack")
-	overlayCallback = callback
-end }
-ns.Scan()
-assert(type(overlayCallback) == "function")
-local ellesmereGlow = ellesmereButton._textOverlay.textures[1]
-assert(ellesmereGlow:IsShown())
-overlayCallback(ellesmereButton, { bag = 0, slot = 0 })
-assert(not ellesmereGlow:IsShown())
-overlayCallback(ellesmereButton, { bag = -1, slot = 1 })
-assert(not ellesmereGlow:IsShown())
-overlayCallback(ellesmereButton, { bag = 0, slot = 1 })
-assert(ellesmereGlow:IsShown())
-state.items[1].itemID = 2
-state.itemTypes[2] = { 2, 1 }
-overlayCallback(ellesmereButton, { bag = 0, slot = 1 })
-assert(not ellesmereGlow:IsShown())
-state.items[1].itemID = 1
-ns.RefreshBagHighlights()
-assert(ellesmereGlow:IsShown())
+assert(ns.alertFrame.strata == "LOW" and ns.alertFrame:GetFrameLevel() == 1)
+local phase = ns.alertFrame.glowPhase
+ns.alertFrame.scripts.OnUpdate(ns.alertFrame, 0.5)
+assert(ns.alertFrame.glowPhase == phase)
 ns.HideScreenAlert()
-assert(not ellesmereGlow:IsShown())
-overlayCallback(ellesmereButton, { bag = 0, slot = 1 })
-assert(not ellesmereGlow:IsShown())
-EUI_MainBagFrame, EUI_Bags = nil, nil
+assert(not ns.alertFrame:IsShown())
+pairs = originalPairs
+C_Container.GetContainerItemInfo = originalItemInfo
+hooksecurefunc = originalHook
+ContainerFrameItemButton_Update = originalItemUpdate
+EUI_Bags = nil
 
 ns, state = setup({ screenIconMode = true, remindWhenNoFood = true })
 state.empty = true
