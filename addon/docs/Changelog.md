@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.8 - 2026-11-07
+
+### Player-facing
+
+- Pulse the gold glow on the reminder icon, extending it slightly beyond the edges to make it easier to notice.
+- Remove bag-item highlighting and its repeated background UI scans to address reported lag and frame drops; the affected test user confirmed the fix.
+- Keep popup and icon reminders beneath ordinary UI windows, including the map and options.
+
+### Technical
+
+- Keep the 1.2-second pulse confined to the visible icon; popup mode does not animate a hidden glow or change reminder timing.
+- Remove bag-frame discovery, item-button hooks, bag-addon overlays, and the periodic highlight refresh.
+- Use LOW frame strata and a low frame level for both reminder modes.
+
 ## 1.0.7 - 2026-11-06
 
 ### Player-facing

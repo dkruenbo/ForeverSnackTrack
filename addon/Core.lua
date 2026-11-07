@@ -969,8 +969,6 @@ eventFrame:RegisterEvent("PLAYER_ALIVE")
 eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-eventFrame:RegisterEvent("BAG_OPEN")
-eventFrame:RegisterEvent("BAG_CLOSED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 if eventFrame.RegisterUnitEvent then
@@ -1014,13 +1012,6 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "BAG_UPDATE_DELAYED" then
 		invalidateBagScan()
 		ns.Scan()
-		if ns.RefreshBagHighlights then
-			ns.RefreshBagHighlights()
-		end
-	elseif event == "BAG_OPEN" or event == "BAG_CLOSED" then
-		if ns.RefreshBagHighlights then
-			ns.RefreshBagHighlights()
-		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		invalidateBagScan()
 		ns.Scan()

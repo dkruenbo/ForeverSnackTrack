@@ -8,7 +8,8 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 - Suppresses reminders during combat, hides a visible alert when combat begins, and checks again when combat ends.
 - Suppresses chat and screen reminders in resting areas by default, hides an existing alert on entry, and checks again on exit. An opt-in **Remind while resting** setting is available in the addon and WeakAura.
 - Hides the on-screen reminder while the player is dead or flying and checks again after resurrection or landing; chat reminders remain unaffected.
-- Adds a bright gold glow to the fixed icon and highlights qualifying XP-food slots in open bags only while a real popup or icon reminder is visible; clear highlights when the alert hides or the item no longer qualifies.
+- Pulses the gold glow on the visible fixed icon with a 1.2-second cycle. Popup mode skips glow animation. Bag-item highlighting is removed; alert updates do not discover bag frames or read bag slots.
+- Uses LOW strata and frame level 1 for popup and icon reminders so ordinary UI windows draw above them.
 - Detects qualifying food by its localized tooltip line describing increased experience from kills and extracts its integer percentage. Mithril Head Trout's current 5% effect is one example.
 - Requires food-and-drink item classification; unavailable classification, loading placeholders, and title-only food tooltips remain unresolved.
 - If a tooltip line has multiple percentages, selects the one most closely associated with its experience-increase wording.

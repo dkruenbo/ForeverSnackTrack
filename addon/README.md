@@ -15,7 +15,8 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Provides a movable screen alert with custom text, duration, size, and color.
 - Scales the reminder from 25% to 150%, with size and display mode saved per character.
 - Offers a fixed-icon alternative to the popup: hover for reminder and selected-food details, left-click to eat, or right-click for food selection, snooze, and dismiss. Drag the icon to reposition it. Both modes use the same reminder visibility rules.
-- Adds a bright gold glow to the fixed icon and highlights qualifying XP food in open bags while a real popup or icon reminder is visible.
+- Pulses the gold glow on the fixed icon while it is visible.
+- Keeps popup and icon reminders beneath ordinary UI windows, including the map and options.
 - Lets you eat the strongest available XP food from the alert or choose another qualifying food in the dropdown, which shows its XP bonus, stack count, and recognized stat bonuses.
 - Uses a 1-minute repeat interval and unlimited screen-alert duration by default on new installations.
 - Starts with default preferences without opening options; closing options checks reminders again.
@@ -27,7 +28,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack-1.0.7.zip](ForeverSnackTrack-1.0.7.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.8.zip](ForeverSnackTrack-1.0.8.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat, resting, or flight, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.

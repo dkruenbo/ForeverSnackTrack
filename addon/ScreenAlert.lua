@@ -1,120 +1,5 @@
 local addonName, ns = ...
 
-local bagHighlightTextures = setmetatable({}, { __mode = "k" })
-local highlightedFoodIDs = {}
-local itemButtonUpdateHooked = false
-local ellesmereOverlayOwner
-
-local function bagSlotForButton(button)
-	local bagID = button.GetBagID and button:GetBagID()
-	if bagID == nil and button.GetParent then
-		local parent = button:GetParent()
-		if parent then
-			bagID = ContainerFrame_GetContainerID and ContainerFrame_GetContainerID(parent)
-			if bagID == nil and parent.GetID then
-				bagID = parent:GetID()
-			end
-		end
-	end
-	local slot = button.GetSlotID and button:GetSlotID()
-	if slot == nil then
-		slot = button.GetID and button:GetID()
-	end
-	return bagID, slot
-end
-
-local function updateBagItemHighlight(button, bagID, slot)
-	local highlight
-	local alert = ns.alertFrame
-	if alert and alert:IsShown() and not alert.isPreview then
-		if bagID == nil or slot == nil then
-			bagID, slot = bagSlotForButton(button)
-		end
-		if type(bagID) == "number" and bagID >= 0 and bagID <= (NUM_BAG_SLOTS or 4)
-			and type(slot) == "number" and slot > 0
-			and C_Container and C_Container.GetContainerItemInfo then
-			local itemInfo = C_Container.GetContainerItemInfo(bagID, slot)
-			if itemInfo and highlightedFoodIDs[itemInfo.itemID] then
-				highlight = bagHighlightTextures[button]
-				if not highlight then
-					local parent = button._textOverlay
-					if (type(parent) ~= "table" and type(parent) ~= "userdata") or not parent.CreateTexture then
-						parent = button
-					end
-					highlight = parent:CreateTexture(nil, "OVERLAY")
-					highlight:SetPoint("TOPLEFT", button, "TOPLEFT", -12, 12)
-					highlight:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 12, -12)
-					highlight:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-					highlight:SetBlendMode("ADD")
-					highlight:SetVertexColor(1, 0.85, 0.2, 1)
-					bagHighlightTextures[button] = highlight
-				end
-			end
-		end
-	end
-	if highlight then
-		highlight:Show()
-	elseif bagHighlightTextures[button] then
-		bagHighlightTextures[button]:Hide()
-	end
-end
-
-local function visitBagButtons(frame, depth, legacySlots)
-	if (frame.GetBagID and frame.GetSlotID)
-		or (legacySlots and frame.IsObjectType and frame:IsObjectType("Button")) then
-		updateBagItemHighlight(frame)
-	end
-	if depth > 0 and frame.GetChildren then
-		for _, child in ipairs({ frame:GetChildren() }) do
-			visitBagButtons(child, depth - 1, legacySlots)
-		end
-	end
-end
-
-function ns.RefreshBagHighlights()
-	if EUI_Bags and type(EUI_Bags.RegisterItemOverlayIcon) == "function"
-		and ellesmereOverlayOwner ~= EUI_Bags then
-		EUI_Bags.RegisterItemOverlayIcon("ForeverSnackTrack", function(button, data)
-			updateBagItemHighlight(button, data.bag, data.slot)
-		end)
-		ellesmereOverlayOwner = EUI_Bags
-	end
-	highlightedFoodIDs = {}
-	for _, texture in pairs(bagHighlightTextures) do
-		texture:Hide()
-	end
-	local alert = ns.alertFrame
-	if not alert or not alert:IsShown() or alert.isPreview then
-		return
-	end
-	for _, food in ipairs(ns.GetAvailableFoods and ns.GetAvailableFoods() or {}) do
-		highlightedFoodIDs[food.itemID] = true
-	end
-	for name, button in pairs(_G) do
-		if type(name) == "string" and name:match("^ContainerFrame.*Item%d+$") then
-			updateBagItemHighlight(button)
-		elseif type(name) == "string" and (name:match("^ContainerFrame%d+$")
-			or name == "ContainerFrameCombinedBags") and button.GetChildren then
-			visitBagButtons(button, 4)
-		end
-	end
-	for _, name in ipairs({ "EUI_MainBagFrame", "EUI_ReagentBagFrame" }) do
-		local frame = _G[name]
-		if frame and frame.GetChildren then
-			visitBagButtons(frame, 6, true)
-		end
-	end
-end
-
-local function hookBagItemUpdates()
-	if itemButtonUpdateHooked or not hooksecurefunc
-		or type(ContainerFrameItemButton_Update) ~= "function" then
-		return
-	end
-	hooksecurefunc("ContainerFrameItemButton_Update", updateBagItemHighlight)
-	itemButtonUpdateHooked = true
-end
-
 local function setAlertPosition(frame)
 	local scale = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
 	frame:ClearAllPoints()
@@ -195,11 +80,12 @@ local function showIconTooltip(frame)
 end
 
 local function createAlertFrame()
-	hookBagItemUpdates()
 	local frame = CreateFrame("Frame", "ForeverSnackTrackAlertFrame", UIParent, "BackdropTemplate")
-	frame.bagHighlightElapsed = 0
+	frame.glowPhase = 0
+	frame.glowAlpha = 1
 	frame:SetSize(460, 128)
-	frame:SetFrameStrata("HIGH")
+	frame:SetFrameStrata("LOW")
+	frame:SetFrameLevel(1)
 	frame:SetClampedToScreen(true)
 	frame:SetMovable(true)
 	frame:EnableMouse(true)
@@ -252,6 +138,7 @@ local function createAlertFrame()
 	frame.iconGlow:SetPoint("TOPLEFT", frame.eatButton, "TOPLEFT", -14, 14)
 	frame.iconGlow:SetPoint("BOTTOMRIGHT", frame.eatButton, "BOTTOMRIGHT", 14, -14)
 	frame.iconGlow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+	frame.iconGlow:SetTexCoord(0.15, 0.85, 0.15, 0.85)
 	frame.iconGlow:SetBlendMode("ADD")
 	frame.iconGlow:SetVertexColor(1, 0.85, 0.2, 1)
 	frame.iconGlow:Hide()
@@ -338,13 +225,12 @@ local function createAlertFrame()
 	frame:SetScript("OnHide", function()
 		if GameTooltip and GameTooltip:IsOwned(frame.eatButton) then GameTooltip:Hide() end
 		if CloseDropDownMenus then CloseDropDownMenus() end
-		if ns.RefreshBagHighlights then ns.RefreshBagHighlights() end
 	end)
 	frame:SetScript("OnUpdate", function(self, elapsed)
-		self.bagHighlightElapsed = (self.bagHighlightElapsed or 0) + elapsed
-		if self.bagHighlightElapsed >= 0.25 then
-			self.bagHighlightElapsed = 0
-			ns.RefreshBagHighlights()
+		if ns.db.screenIconMode then
+			self.glowPhase = (self.glowPhase + elapsed) % 1.2
+			self.glowAlpha = 0.25 + 0.75 * (0.5 + 0.5 * math.cos(self.glowPhase * math.pi * 2 / 1.2))
+			self.iconGlow:SetAlpha(self.glowAlpha)
 		end
 		if not self.remaining then
 			return
@@ -410,7 +296,6 @@ function ns.ShowScreenAlert(message, isPreview)
 	frame.isPreview = not not isPreview
 	frame.remaining = ns.db.screenDuration > 0 and ns.db.screenDuration or (isPreview and 5 or nil)
 	frame:Show()
-	ns.RefreshBagHighlights()
 	return true
 end
 
@@ -438,7 +323,6 @@ function ns.HideScreenAlert(preservePreview)
 	end
 	ns.alertFrame.remaining = nil
 	ns.alertFrame:Hide()
-	ns.RefreshBagHighlights()
 end
 
 function ns.RefreshScreenAlert()
