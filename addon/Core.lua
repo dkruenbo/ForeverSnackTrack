@@ -22,6 +22,10 @@ local foodStatsCache = {}
 local auraTooltipCache = {}
 local cachedBagResult
 local cachedQualifyingFoods
+local cachedFoodScanComplete = false
+local cachedFoodSupply
+local gourmandScanComplete = false
+local cachedGourmandRank
 local tooltipCacheTime
 local lastReminderTime
 local reminderState
@@ -348,6 +352,8 @@ local function hasQualifyingFood()
 	if cachedBagResult ~= nil then
 		return cachedBagResult
 	end
+	cachedFoodSupply = nil
+	cachedFoodScanComplete = false
 	if not C_Container or not C_Container.GetContainerNumSlots or not C_Container.GetContainerItemInfo then
 		return nil
 	end
@@ -429,6 +435,7 @@ local function hasQualifyingFood()
 		return first.itemName < second.itemName
 	end)
 	cachedQualifyingFoods = qualifyingFoods
+	cachedFoodScanComplete = not unresolvedTooltip
 	if unresolvedTooltip then
 		return bestBonusPercent > 0 and bestBonusPercent or nil
 	end
@@ -439,6 +446,8 @@ end
 local function invalidateBagScan(itemID)
 	cachedBagResult = nil
 	cachedQualifyingFoods = nil
+	cachedFoodSupply = nil
+	cachedFoodScanComplete = false
 	if itemID then
 		foodTooltipCache[itemID] = nil
 		foodStatsCache[itemID] = nil
@@ -451,6 +460,126 @@ function ns.GetAvailableFoods()
 		hasQualifyingFood()
 	end
 	return cachedQualifyingFoods or {}
+end
+
+local function traitValue(api, ...)
+	if type(api) ~= "function" then
+		return nil
+	end
+	local success, value = pcall(api, ...)
+	if success then
+		return value
+	end
+end
+
+local function gourmandRank()
+	if gourmandScanComplete then
+		return cachedGourmandRank
+	end
+	gourmandScanComplete = true
+	if not C_Traits then
+		return nil
+	end
+	local configs = {}
+	local seen = {}
+	local function addConfig(configID, priority)
+		if type(configID) ~= "number" then
+			return
+		end
+		if seen[configID] then
+			seen[configID].priority = math.max(seen[configID].priority, priority)
+		else
+			local config = { id = configID, priority = priority }
+			seen[configID] = config
+			table.insert(configs, config)
+		end
+	end
+	for name, configType in pairs(Enum and Enum.TraitConfigType or {}) do
+		local configIDs = traitValue(C_Traits.GetConfigsByType, configType)
+		if type(configIDs) == "table" then
+			local priority = tostring(name):lower():find("legacy", 1, true) and 2 or 1
+			for _, configID in ipairs(configIDs) do
+				addConfig(configID, priority)
+			end
+		end
+	end
+	addConfig(traitValue(C_ClassTalents and C_ClassTalents.GetActiveConfigID), 0)
+	table.sort(configs, function(first, second) return first.priority > second.priority end)
+	for _, config in ipairs(configs) do
+		local info = traitValue(C_Traits.GetConfigInfo, config.id)
+		for _, treeID in ipairs(type(info) == "table" and info.treeIDs or {}) do
+			local nodeIDs = traitValue(C_Traits.GetTreeNodes, treeID)
+			for _, nodeID in ipairs(type(nodeIDs) == "table" and nodeIDs or {}) do
+				local node = traitValue(C_Traits.GetNodeInfo, config.id, nodeID)
+				if type(node) == "table" then
+					local matches = nodeID == 1225499
+					for _, entryID in ipairs(node.entryIDs or {}) do
+						local entry = traitValue(C_Traits.GetEntryInfo, config.id, entryID)
+						local definitionID = type(entry) == "table" and entry.definitionID
+						local definition = definitionID and traitValue(C_Traits.GetDefinitionInfo, definitionID)
+						if entryID == 1225499 or definitionID == 1225499
+							or (type(definition) == "table" and definition.spellID == 1225499) then
+							matches = true
+						end
+					end
+					if matches then
+						local rank = node.ranksPurchased
+						if rank == nil and type(node.activeEntry) == "table" then rank = node.activeEntry.rank end
+						if rank == nil then rank = node.currentRank or node.activeRank end
+						if type(rank) == "number" and rank >= 0 and rank <= 3 and rank == math.floor(rank) then
+							cachedGourmandRank = rank
+							return rank
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+local function invalidateFoodDuration()
+	gourmandScanComplete = false
+	cachedGourmandRank = nil
+	cachedFoodSupply = nil
+end
+
+function ns.GetFoodSupply()
+	if cachedFoodSupply then
+		return cachedFoodSupply
+	end
+	local count = 0
+	for _, food in ipairs(ns.GetAvailableFoods()) do
+		count = count + food.count
+	end
+	local rank = gourmandRank()
+	local duration = (15 + (rank or 0) * 5) * 60
+	cachedFoodSupply = {
+		count = count,
+		seconds = count * duration,
+		perServingSeconds = duration,
+		complete = cachedFoodScanComplete,
+		isFallback = rank == nil,
+		gourmandRank = rank,
+	}
+	return cachedFoodSupply
+end
+
+function ns.GetFoodSupplyText()
+	local supply = ns.GetFoodSupply()
+	local minutes = math.floor(supply.seconds / 60)
+	local template = supply.complete and ForeverSnackTrackL.foodSupply or ForeverSnackTrackL.foodSupplyPartial
+	if supply.count == 1 then
+		template = supply.complete and ForeverSnackTrackL.foodSupplySingle or ForeverSnackTrackL.foodSupplyPartialSingle
+	end
+	local message = string.format(template, supply.count, math.floor(minutes / 60), minutes % 60)
+	if not supply.complete and supply.count == 0 then
+		message = ForeverSnackTrackL.foodSupplyLoading
+	end
+	local rankDetail = supply.isFallback and ForeverSnackTrackL.foodSupplyFallback
+		or string.format(ForeverSnackTrackL.foodSupplyGourmand, supply.gourmandRank)
+	local durationDetail = supply.isFallback and ForeverSnackTrackL.foodSupplyFallbackDuration
+		or string.format(ForeverSnackTrackL.foodSupplyDuration, supply.perServingSeconds / 60)
+	return message, rankDetail, durationDetail
 end
 
 local function hasExperienceBuff(requiredBonusPercent)
@@ -643,6 +772,8 @@ function ns.Scan()
 		auraTooltipCache = {}
 		cachedBagResult = nil
 		cachedQualifyingFoods = nil
+		cachedFoodSupply = nil
+		cachedFoodScanComplete = false
 		tooltipCacheTime = now
 	end
 
@@ -971,6 +1102,10 @@ eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+if C_Traits then
+	pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_CONFIG_UPDATED")
+	pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_CONFIG_LIST_UPDATED")
+end
 if eventFrame.RegisterUnitEvent then
 	eventFrame:RegisterUnitEvent("UNIT_AURA", "player")
 else
@@ -989,6 +1124,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		end
 	elseif event == "PLAYER_LOGIN" then
 		invalidateBagScan()
+		invalidateFoodDuration()
 		if C_Timer and C_Timer.NewTicker then
 			scanTicker = C_Timer.NewTicker(60, ns.Scan)
 			flightTicker = C_Timer.NewTicker(0.25, updateFlightSuppression)
@@ -1014,7 +1150,10 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		ns.Scan()
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		invalidateBagScan()
+		invalidateFoodDuration()
 		ns.Scan()
+	elseif event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_CONFIG_LIST_UPDATED" then
+		invalidateFoodDuration()
 	elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "PLAYER_STOPPED_MOVING" then
 		updateFlightSuppression()
 	elseif event == "PLAYER_LEVEL_UP" then
@@ -1039,5 +1178,10 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "GET_ITEM_INFO_RECEIVED" then
 		invalidateBagScan(arg1)
 		ns.Scan()
+	end
+	if ns.RefreshFoodSupplyDisplay and (event == "BAG_UPDATE_DELAYED" or event == "GET_ITEM_INFO_RECEIVED"
+		or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_CONFIG_LIST_UPDATED"
+		or event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_LOGIN") then
+		ns.RefreshFoodSupplyDisplay()
 	end
 end)

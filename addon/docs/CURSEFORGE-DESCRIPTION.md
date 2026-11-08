@@ -2,6 +2,7 @@ Forever SnackTrack reminds you to use the XP food in your bags. It reads the kil
 
 - Chat reminders, a movable on-screen alert, or both.
 - A chat-only warning before the XP buff expires, with a configurable lead time.
+- Carried XP-food counts and estimated buff time, with the Gourmand Legacy talent identified and a labeled 15-minute fallback when rank detection is unavailable.
 - Eat the strongest available XP food from the alert, or choose another qualifying food from a dropdown showing XP and recognized stat bonuses.
 - Custom alert text, color, size, duration, and repeat interval.
 - Reminder size down to 25%, or a compact fixed icon with a pulsing gold glow, food information on hover, and eating/action controls.

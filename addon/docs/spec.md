@@ -5,6 +5,7 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 ## Features
 
 - Scans the player's bags in the background once per minute.
+- Reuses cached qualifying-food stack counts to show servings and estimated carried buff time in the popup, icon tooltip, and options. Trait detection prioritizes Legacy configurations and models 15/20/25/30 minutes for Gourmand ranks 0/1/2/3; missing data uses a labeled 15-minute fallback. All durations remain estimates pending Forever verification. Partial scans show only known supply, active-buff remaining time is excluded, and frame updates never scan inventory or traits for this display.
 - Suppresses reminders during combat, hides a visible alert when combat begins, and checks again when combat ends.
 - Suppresses chat and screen reminders in resting areas by default, hides an existing alert on entry, and checks again on exit. An opt-in **Remind while resting** setting is available in the addon and WeakAura.
 - Hides the on-screen reminder while the player is dead or flying and checks again after resurrection or landing; chat reminders remain unaffected.
