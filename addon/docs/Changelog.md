@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.9 - 2026-11-08
+
+### Player-facing
+
+- Show carried XP-food servings and estimated buff time in the popup, icon tooltip, and options, separate from the active buff.
+- Identify Gourmand as a Legacy talent, account for its detected rank, use a labeled 15-minute fallback when unavailable, and mark loading food counts as partial.
+
+### Technical
+
+- Reuse cached qualifying-food counts and cache trait lookups; refresh supply displays on bag/item-data and trait changes, not frame updates.
+- Split the Gourmand rank and estimated duration into separate tooltip/options lines for easier reading.
+- Estimate 15/20/25/30 minutes per serving for Gourmand ranks 0/1/2/3. Trait identifiers, rank fields, duration values, and UI layout require Forever client verification.
+
 ## 1.0.8 - 2026-11-07
 
 ### Player-facing

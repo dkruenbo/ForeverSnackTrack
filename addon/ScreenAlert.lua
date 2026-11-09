@@ -9,8 +9,9 @@ end
 local function updateAlertAppearance(frame)
 	local color = ns.db.screenColor
 	local iconMode = ns.db.screenIconMode
-	frame:SetSize(iconMode and 48 or 460, iconMode and 48 or 128)
+	frame:SetSize(iconMode and 48 or 460, iconMode and 48 or 148)
 	frame.text:SetShown(not iconMode)
+	frame.supplyText:SetShown(not iconMode and not frame.isPreview)
 	frame.iconTexture:SetShown(iconMode)
 	if iconMode then
 		frame.iconGlow:Show()
@@ -75,8 +76,30 @@ local function showIconTooltip(frame)
 				break
 			end
 		end
+		local summary, rankDetail, durationDetail = ns.GetFoodSupplyText()
+		GameTooltip:AddLine(summary, 1, 0.85, 0.3, true)
+		GameTooltip:AddLine(rankDetail, 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine(durationDetail, 0.8, 0.8, 0.8, true)
 	end
 	GameTooltip:Show()
+end
+
+function ns.RefreshFoodSupplyDisplay()
+	local frame = ns.alertFrame
+	local panel = ns.optionsPanel
+	local alertVisible = frame and frame:IsShown() and not frame.isPreview
+	local optionsVisible = panel and panel:IsShown()
+	if not alertVisible and not optionsVisible then
+		return
+	end
+	local summary, rankDetail, durationDetail = ns.GetFoodSupplyText()
+	if alertVisible then
+		frame.supplyText:SetText(summary)
+		if GameTooltip and GameTooltip:IsOwned(frame.eatButton) then showIconTooltip(frame) end
+	end
+	if optionsVisible then
+		panel.supplyText:SetText(summary .. "\n" .. rankDetail .. "\n" .. durationDetail)
+	end
 end
 
 local function createAlertFrame()
@@ -106,6 +129,11 @@ local function createAlertFrame()
 	frame.text:SetHeight(64)
 	frame.text:SetJustifyH("CENTER")
 	frame.text:SetWordWrap(true)
+	frame.supplyText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	frame.supplyText:SetPoint("TOP", frame, "TOP", 0, -84)
+	frame.supplyText:SetWidth(420)
+	frame.supplyText:SetHeight(18)
+	frame.supplyText:SetJustifyH("CENTER")
 
 	frame.snoozeButton = CreateFrame("Button", "ForeverSnackTrackAlertSnoozeButton", frame, "UIPanelButtonTemplate")
 	frame.snoozeButton:SetSize(120, 24)
@@ -296,6 +324,7 @@ function ns.ShowScreenAlert(message, isPreview)
 	frame.isPreview = not not isPreview
 	frame.remaining = ns.db.screenDuration > 0 and ns.db.screenDuration or (isPreview and 5 or nil)
 	frame:Show()
+	ns.RefreshFoodSupplyDisplay()
 	return true
 end
 

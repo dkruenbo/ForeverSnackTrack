@@ -29,6 +29,7 @@ local function setup(settings, accountSettings, legacySettings)
 		buffTooltips = {},
 		spellDescriptions = {},
 		auras = nil,
+		traitReads = 0,
 	}
 	local methods = {}
 	local function object()
@@ -147,6 +148,22 @@ local function setup(settings, accountSettings, legacySettings)
 	RETRIEVING_ITEM_INFO = "Retrieving item information"
 	ITEM_SPELL_TRIGGER_ONUSE = "Use:"
 	C_Spell = { GetSpellDescription = function(spellID) return state.spellDescriptions[spellID] end }
+	C_Traits, C_ClassTalents, Enum = nil, nil, nil
+	if settings and settings.mockTraits then
+		state.gourmandRank = settings.mockGourmandRank or 0
+		Enum = { TraitConfigType = { Legacy = 5 } }
+		C_Traits = {
+			GetConfigsByType = function() return { 101 } end,
+			GetConfigInfo = function() return { treeIDs = { 201 } } end,
+			GetTreeNodes = function() return { 301 } end,
+			GetNodeInfo = function()
+				state.traitReads = state.traitReads + 1
+				return { entryIDs = { 401 }, ranksPurchased = state.gourmandRank }
+			end,
+			GetEntryInfo = function() return { definitionID = 501 } end,
+			GetDefinitionInfo = function() return { spellID = 1225499 } end,
+		}
+	end
 	C_Item = { GetItemInfoInstant = function(itemID)
 		local itemType = state.itemTypes[itemID]
 		return itemID, nil, nil, nil, nil,
@@ -755,7 +772,7 @@ for _, iconMode in ipairs({ false, true }) do
 	local frame = ns.alertFrame
 	assert(ns.db.screenScale == 0.25 and frame.scale == 0.25)
 	assert(frame.size[1] == (iconMode and 48 or 460))
-	assert(frame.size[2] == (iconMode and 48 or 128))
+	assert(frame.size[2] == (iconMode and 48 or 148))
 	assert(frame.text:IsShown() ~= iconMode and frame.iconTexture:IsShown() == iconMode)
 	assert(frame.eatButton:GetAttribute("type1") == "macro")
 	assert(frame.eatButton:GetAttribute("type2") == "none")
@@ -900,4 +917,110 @@ ns.Scan()
 assert(ns.alertFrame.eatButton:IsShown() and ns.alertFrame.eatButton:GetAttribute("type1") == nil)
 ns.alertFrame.eatButton.scripts.PostClick(ns.alertFrame.eatButton, "RightButton")
 assert(#state.menuEntries == 2)
-print("PASS: addon alert state, food actions, finite expiry, suppression, scaled positioning, classification and tooltip retries")
+ns, state = setup()
+state.items = {
+	{ bagID = 0, slot = 1, itemID = 1, stackCount = 8 },
+	{ bagID = 0, slot = 2, itemID = 1, stackCount = 12 },
+	{ bagID = 0, slot = 3, itemID = 2, stackCount = 4 },
+	{ bagID = 0, slot = 4, itemID = 3, stackCount = 99 },
+	{ bagID = -1, slot = 1, itemID = 1, stackCount = 99 },
+}
+state.itemTypes[3] = { 2, 1 }
+local supply = ns.GetFoodSupply()
+assert(supply.count == 24 and supply.seconds == 24 * 15 * 60)
+assert(supply.complete and supply.isFallback)
+local supplyReads = state.bagReads
+assert(ns.GetFoodSupply() == supply and state.bagReads == supplyReads)
+state.items[1].stackCount = 7
+state:event("BAG_UPDATE_DELAYED")
+assert(ns.GetFoodSupply().count == 23)
+state.foodTooltips[2] = { lines = { { leftText = "Loading food" } } }
+state:event("GET_ITEM_INFO_RECEIVED", 2)
+supply = ns.GetFoodSupply()
+assert(supply.count == 19 and not supply.complete)
+state.empty = true
+state:event("BAG_UPDATE_DELAYED")
+supply = ns.GetFoodSupply()
+assert(supply.count == 0 and supply.seconds == 0 and supply.complete)
+for rank = 0, 3 do
+	ns, state = setup({ mockTraits = true, mockGourmandRank = rank })
+	supply = ns.GetFoodSupply()
+	assert(supply.gourmandRank == rank and not supply.isFallback)
+	assert(supply.perServingSeconds == (15 + rank * 5) * 60)
+	local traitReads = state.traitReads
+	assert(ns.GetFoodSupply() == supply and state.traitReads == traitReads)
+	state.gourmandRank = (rank + 1) % 4
+	state:event("TRAIT_CONFIG_UPDATED", 101)
+	supply = ns.GetFoodSupply()
+	assert(supply.gourmandRank == state.gourmandRank and state.traitReads == traitReads + 1)
+	state.gourmandRank = nil
+	state:event("TRAIT_CONFIG_UPDATED", 101)
+	supply = ns.GetFoodSupply()
+	assert(supply.isFallback and supply.gourmandRank == nil and supply.perServingSeconds == 900)
+end
+ns, state = setup({ mockTraits = true })
+C_Traits.GetNodeInfo = function() error("Trait data unavailable") end
+supply = ns.GetFoodSupply()
+assert(supply.isFallback and supply.perServingSeconds == 900)
+for _, iconMode in ipairs({ false, true }) do
+	ns, state = setup({ screenIconMode = iconMode, screenDuration = 5,
+		repeatReminders = false, mockTraits = true, mockGourmandRank = 2 })
+	state.items[1].stackCount = 4
+	ns.Scan()
+	local frame = ns.alertFrame
+	assert(frame.supplyText:GetText():find("4 servings, about 1h 40m", 1, true))
+	assert(frame.supplyText:IsShown() ~= iconMode)
+	if iconMode then
+		frame.eatButton.scripts.OnEnter()
+		assert(GameTooltip.lines[#GameTooltip.lines - 1] == "Gourmand Legacy talent: rank 2/3")
+		assert(GameTooltip.lines[#GameTooltip.lines] == "Estimated: 25 min per food.")
+	end
+	local bagReads, traitReads = state.bagReads, state.traitReads
+	for tick = 1, 60 do frame.scripts.OnUpdate(frame, 1 / 60) end
+	for request = 1, 20 do ns.GetFoodSupplyText() end
+	assert(state.bagReads == bagReads and state.traitReads == traitReads)
+	local remaining = frame.remaining
+	state.items[1].stackCount = 3
+	state:event("BAG_UPDATE_DELAYED")
+	assert(frame.supplyText:GetText():find("3 servings, about 1h 15m", 1, true))
+	state.gourmandRank = 3
+	state:event("TRAIT_CONFIG_UPDATED", 101)
+	assert(frame.supplyText:GetText():find("3 servings, about 1h 30m", 1, true))
+	assert(frame.remaining == remaining and state.chats == 1)
+	state.items[2] = { bagID = 0, slot = 2, itemID = 2, stackCount = 2 }
+	state.foodTooltips[2] = { lines = { { leftText = "Loading food" } } }
+	state:event("BAG_UPDATE_DELAYED")
+	assert(frame.supplyText:GetText():find("Known food supply:", 1, true))
+	assert(not ns.GetFoodSupply().complete)
+	state.foodTooltips[2] = { lines = {
+		{ leftText = "Loaded food" }, { leftText = "Increases experience from kills by 5%" },
+	} }
+	state:event("GET_ITEM_INFO_RECEIVED", 2)
+	assert(frame.supplyText:GetText():find("5 servings, about 2h 30m", 1, true))
+	ns.optionsPanel:Show()
+	ns.RefreshFoodSupplyDisplay()
+	assert(ns.optionsPanel.supplyText:GetText():find("Gourmand Legacy talent: rank 3/3\nEstimated: 30 min per food.", 1, true))
+	ns.ShowScreenAlert("Preview", true)
+	assert(not frame.supplyText:IsShown())
+	if iconMode then
+		frame.eatButton.scripts.OnEnter()
+		assert(not table.concat(GameTooltip.lines, " "):find("Food supply:", 1, true))
+	end
+end
+ns, state = setup()
+state.partial = true
+local loadingText = ns.GetFoodSupplyText()
+assert(loadingText == ForeverSnackTrackL.foodSupplyLoading)
+state.partial = false
+state:event("BAG_UPDATE_DELAYED")
+local fallbackText, fallbackRank, fallbackDuration = ns.GetFoodSupplyText()
+assert(fallbackText:find("1 serving, about 0h 15m", 1, true))
+assert(fallbackRank == "Gourmand Legacy talent: rank unknown")
+assert(fallbackDuration == "Estimate: 15 min per food.")
+local carriedSeconds = ns.GetFoodSupply().seconds
+state.buff = "Increases experience from kills by 5%"
+state.auraExpirationTime = state.now + 300
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(ns.GetFoodSupply().seconds == carriedSeconds)
+print("PASS: addon alert state, food actions, finite expiry, suppression, scaled positioning, classification, tooltip retries and food supply")
