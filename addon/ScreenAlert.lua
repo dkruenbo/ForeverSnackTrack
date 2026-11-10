@@ -41,7 +41,7 @@ local function updateAlertAppearance(frame)
 	frame:SetBackdropBorderColor(color.r, color.g, color.b, 0.9)
 end
 
-local function setEatFood(frame, itemID)
+local function setEatFood(frame, itemID, savePreference)
 	if InCombatLockdown and InCombatLockdown() then
 		return false
 	end
@@ -53,10 +53,43 @@ local function setEatFood(frame, itemID)
 			frame.eatButton:SetAttribute("type1", "macro")
 			frame.eatButton:SetAttribute("macrotext1", macroText)
 			frame.selectedFoodID = food.itemID
+			if savePreference and ns.db then
+				ns.db.selectedFoodItemID = food.itemID
+			end
 			return true
 		end
 	end
 	return false
+end
+
+function ns.RefreshSelectedFood()
+	local frame = ns.alertFrame
+	if not frame or not ns.db or not frame:IsShown() or frame.isPreview
+		or (InCombatLockdown and InCombatLockdown()) then
+		return
+	end
+	local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
+	local selectedID = ns.db.selectedFoodItemID > 0 and ns.db.selectedFoodItemID or frame.selectedFoodID
+	local selectedAvailable = false
+	for _, food in ipairs(foods) do
+		if food.itemID == selectedID then
+			selectedAvailable = true
+			break
+		end
+	end
+	if not selectedAvailable then
+		selectedID = foods[1] and foods[1].itemID
+	end
+	frame.hasFood = #foods > 0
+	if selectedID then
+		setEatFood(frame, selectedID)
+	else
+		frame.eatButton:SetAttribute("type", nil)
+		frame.eatButton:SetAttribute("type1", nil)
+		frame.eatButton:SetAttribute("macrotext", nil)
+		frame.eatButton:SetAttribute("macrotext1", nil)
+	end
+	updateAlertAppearance(frame)
 end
 
 local function showIconTooltip(frame)
@@ -80,6 +113,7 @@ local function showIconTooltip(frame)
 		GameTooltip:AddLine(summary, 1, 0.85, 0.3, true)
 		GameTooltip:AddLine(rankDetail, 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine(durationDetail, 0.8, 0.8, 0.8, true)
+		GameTooltip:AddLine(ns.GetFoodBuffComparisonText(), 0.8, 0.8, 0.8, true)
 	end
 	GameTooltip:Show()
 end
@@ -212,7 +246,7 @@ local function createAlertFrame()
 				end
 				info.checked = frame.selectedFoodID == food.itemID
 				info.func = function()
-					setEatFood(frame, food.itemID)
+					setEatFood(frame, food.itemID, true)
 				end
 				UIDropDownMenu_AddButton(info, level)
 			end
@@ -310,6 +344,9 @@ function ns.ShowScreenAlert(message, isPreview)
 		local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
 		if #foods > 0 then
 			frame.hasFood = true
+			if not frame.selectedFoodID and ns.db.selectedFoodItemID > 0 then
+				frame.selectedFoodID = ns.db.selectedFoodItemID
+			end
 			if not frame.selectedFoodID or not setEatFood(frame, frame.selectedFoodID) then
 				setEatFood(frame, foods[1].itemID)
 			end

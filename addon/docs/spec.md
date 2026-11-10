@@ -5,7 +5,9 @@ The addon helps players maximize XP from kills by tracking food that grants an e
 ## Features
 
 - Scans the player's bags in the background once per minute.
-- Reuses cached qualifying-food stack counts to show servings and estimated carried buff time in the popup, icon tooltip, and options. Trait detection prioritizes Legacy configurations and models 15/20/25/30 minutes for Gourmand ranks 0/1/2/3; missing data uses a labeled 15-minute fallback. All durations remain estimates pending Forever verification. Partial scans show only known supply, active-buff remaining time is excluded, and frame updates never scan inventory or traits for this display.
+- Reuses cached qualifying-food stack counts to show servings and estimated carried buff time in the popup, icon tooltip, and options. Durations use compact units (`15m`, `1h 15m`, `2h`). Trait detection prioritizes Legacy configurations and models 15/20/25/30 minutes for Gourmand ranks 0/1/2/3; missing data uses a labeled 15-minute fallback. All durations remain estimates pending Forever verification. Partial scans show only known supply, active-buff remaining time is excluded, and frame updates never scan inventory or traits for this display.
+- Persists the selected XP-food item ID per character. If it is absent from the current recognized-food scan, use a recognized fallback without overwriting the preference; restore it automatically when it becomes available again.
+- Shows active XP buff percentage and remaining time alongside the carried-food bonus in the icon tooltip when known. Read only the state cached by reminder scans; refresh on existing bag/item-data and aura events, never on hover or per-frame updates.
 - Suppresses reminders during combat, hides a visible alert when combat begins, and checks again when combat ends.
 - Suppresses chat and screen reminders in resting areas by default, hides an existing alert on entry, and checks again on exit. An opt-in **Remind while resting** setting is available in the addon and WeakAura.
 - Hides the on-screen reminder while the player is dead or flying and checks again after resurrection or landing; chat reminders remain unaffected.

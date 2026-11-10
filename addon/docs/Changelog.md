@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.10 - 2026-11-10
+
+### Player-facing
+
+- Format carried-food estimates compactly and compare the active XP buff with the carried food bonus in the icon tooltip.
+- Remember the selected food per character; if it is unavailable, use another recognized food without changing the saved preference.
+
+### Technical
+
+- Use only cached scan results for the tooltip comparison and update it on existing aura, bag, and item-data events; add no hover-triggered scans.
+- Keep duration units compact by omitting zero hours or minutes.
+
 ## 1.0.9 - 2026-11-08
 
 ### Player-facing
