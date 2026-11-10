@@ -13,6 +13,7 @@ local defaults = {
 	screenDuration = 0,
 	screenScale = 1,
 	screenIconMode = false,
+	selectedFoodItemID = 0,
 	alertOffsetX = 0,
 	alertOffsetY = 120,
 }
@@ -24,6 +25,7 @@ local cachedBagResult
 local cachedQualifyingFoods
 local cachedFoodScanComplete = false
 local cachedFoodSupply
+local cachedBuffStatus
 local gourmandScanComplete = false
 local cachedGourmandRank
 local tooltipCacheTime
@@ -202,6 +204,11 @@ local function initializeSettings()
 	end
 	ForeverSnackTrackCharDB.screenScale = math.max(0.25,
 		math.min(1.5, ForeverSnackTrackCharDB.screenScale))
+	local selectedFoodItemID = ForeverSnackTrackCharDB.selectedFoodItemID
+	if type(selectedFoodItemID) ~= "number" or selectedFoodItemID <= 0
+		or selectedFoodItemID ~= math.floor(selectedFoodItemID) then
+		ForeverSnackTrackCharDB.selectedFoodItemID = 0
+	end
 	if type(ForeverSnackTrackCharDB.screenColor) ~= "table" then
 		ForeverSnackTrackCharDB.screenColor = { r = 1, g = 0.82, b = 0 }
 	else
@@ -548,8 +555,10 @@ function ns.GetFoodSupply()
 		return cachedFoodSupply
 	end
 	local count = 0
+	local bestBonusPercent = 0
 	for _, food in ipairs(ns.GetAvailableFoods()) do
 		count = count + food.count
+		bestBonusPercent = math.max(bestBonusPercent, food.bonusPercent)
 	end
 	local rank = gourmandRank()
 	local duration = (15 + (rank or 0) * 5) * 60
@@ -560,18 +569,28 @@ function ns.GetFoodSupply()
 		complete = cachedFoodScanComplete,
 		isFallback = rank == nil,
 		gourmandRank = rank,
+		bestBonusPercent = bestBonusPercent > 0 and bestBonusPercent or nil,
 	}
 	return cachedFoodSupply
 end
 
+local function formatDuration(seconds)
+	local totalMinutes = math.floor(math.max(0, seconds) / 60)
+	local hours = math.floor(totalMinutes / 60)
+	local minutes = totalMinutes % 60
+	if hours > 0 then
+		return minutes > 0 and string.format("%dh %dm", hours, minutes) or string.format("%dh", hours)
+	end
+	return string.format("%dm", minutes)
+end
+
 function ns.GetFoodSupplyText()
 	local supply = ns.GetFoodSupply()
-	local minutes = math.floor(supply.seconds / 60)
 	local template = supply.complete and ForeverSnackTrackL.foodSupply or ForeverSnackTrackL.foodSupplyPartial
 	if supply.count == 1 then
 		template = supply.complete and ForeverSnackTrackL.foodSupplySingle or ForeverSnackTrackL.foodSupplyPartialSingle
 	end
-	local message = string.format(template, supply.count, math.floor(minutes / 60), minutes % 60)
+	local message = string.format(template, supply.count, formatDuration(supply.seconds))
 	if not supply.complete and supply.count == 0 then
 		message = ForeverSnackTrackL.foodSupplyLoading
 	end
@@ -580,6 +599,34 @@ function ns.GetFoodSupplyText()
 	local durationDetail = supply.isFallback and ForeverSnackTrackL.foodSupplyFallbackDuration
 		or string.format(ForeverSnackTrackL.foodSupplyDuration, supply.perServingSeconds / 60)
 	return message, rankDetail, durationDetail
+end
+
+function ns.GetFoodBuffComparisonText()
+	local supply = cachedFoodSupply
+	local buff = cachedBuffStatus
+	if not supply or not supply.complete then
+		return ForeverSnackTrackL.foodBuffComparisonLoading
+	end
+	if not supply.bestBonusPercent then
+		if buff and buff.complete and type(buff.bonusPercent) == "number" then
+			return string.format(ForeverSnackTrackL.foodBuffComparisonNoFood, buff.bonusPercent)
+		end
+		return ForeverSnackTrackL.foodBuffComparisonNoFoodNone
+	end
+	if not buff or not buff.complete then
+		return string.format(ForeverSnackTrackL.foodBuffComparisonUnknown, supply.bestBonusPercent)
+	end
+	if type(buff.bonusPercent) ~= "number" then
+		return string.format(ForeverSnackTrackL.foodBuffComparisonNoActive, supply.bestBonusPercent)
+	end
+	local expirationTime = buff.expirationTime
+	if type(expirationTime) == "number" and expirationTime > GetTime() then
+		local minutesLeft = math.ceil((expirationTime - GetTime()) / 60)
+		return string.format(ForeverSnackTrackL.foodBuffComparisonTimed,
+			supply.bestBonusPercent, buff.bonusPercent, formatDuration(minutesLeft * 60))
+	end
+	return string.format(ForeverSnackTrackL.foodBuffComparisonActive,
+		supply.bestBonusPercent, buff.bonusPercent)
 end
 
 local function hasExperienceBuff(requiredBonusPercent)
@@ -732,6 +779,7 @@ function ns.Scan()
 	if not ns.db then
 		return
 	end
+	cachedBuffStatus = nil
 	local playerLevel = UnitLevel and UnitLevel("player")
 	if type(playerLevel) == "number" and playerLevel >= 60 then
 		lastReminderTime = nil
@@ -782,6 +830,11 @@ function ns.Scan()
 	local hasBuff, buffExpirationTime, buffSpellID, knownBuffPercent
 	if hasFood or ns.db.remindWhenNoFood or ns.db.buffExpiryWarningMinutes > 0 then
 		hasBuff, buffExpirationTime, buffSpellID, knownBuffPercent = hasExperienceBuff(requiredBonusPercent)
+		cachedBuffStatus = {
+			complete = hasBuff ~= nil,
+			bonusPercent = type(hasBuff) == "number" and hasBuff or nil,
+			expirationTime = buffExpirationTime,
+		}
 	end
 	warnAboutBuffExpiry(knownBuffPercent or (type(hasBuff) == "number" and hasBuff),
 		buffExpirationTime, buffSpellID, now)
@@ -1074,8 +1127,12 @@ end
 local eventFrame = CreateFrame("Frame")
 
 local function scheduleAuraScan()
-	if not C_Timer or not C_Timer.After then
+	local function scanAndRefresh()
 		ns.Scan()
+		if ns.RefreshFoodSupplyDisplay then ns.RefreshFoodSupplyDisplay() end
+	end
+	if not C_Timer or not C_Timer.After then
+		scanAndRefresh()
 		return
 	end
 	if auraScanPending then
@@ -1084,7 +1141,7 @@ local function scheduleAuraScan()
 	auraScanPending = true
 	C_Timer.After(0.5, function()
 		auraScanPending = false
-		ns.Scan()
+		scanAndRefresh()
 	end)
 end
 
@@ -1148,6 +1205,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "BAG_UPDATE_DELAYED" then
 		invalidateBagScan()
 		ns.Scan()
+		if ns.RefreshSelectedFood then ns.RefreshSelectedFood() end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		invalidateBagScan()
 		invalidateFoodDuration()
@@ -1173,11 +1231,13 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "UNIT_AURA" then
 		if arg1 == "player" then
 			auraTooltipCache = {}
+			cachedBuffStatus = nil
 			scheduleAuraScan()
 		end
 	elseif event == "GET_ITEM_INFO_RECEIVED" then
 		invalidateBagScan(arg1)
 		ns.Scan()
+		if ns.RefreshSelectedFood then ns.RefreshSelectedFood() end
 	end
 	if ns.RefreshFoodSupplyDisplay and (event == "BAG_UPDATE_DELAYED" or event == "GET_ITEM_INFO_RECEIVED"
 		or event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_CONFIG_LIST_UPDATED"

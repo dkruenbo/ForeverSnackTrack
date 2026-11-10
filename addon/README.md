@@ -5,7 +5,9 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 ## Features
 
 - Scans carried bags for items classified as food and drink whose tooltip grants additional experience from kills and extracts its percentage.
-- Shows carried XP-food servings and estimated buff time in the popup, icon tooltip, and options. The tooltip names the Gourmand Legacy talent and its rank; if rank detection fails, it labels the 15-minute-per-food fallback. Loading food counts remain partial, and active-buff time is separate.
+- Shows carried XP-food servings and estimated buff time in the popup, icon tooltip, and options. Durations use compact units such as `15m` and `1h 15m`. The tooltip compares the active XP buff with carried food using cached scan data.
+- Remembers the selected food per character. If it is unavailable, the alert uses another recognized food without replacing the saved preference.
+- The estimate names the Gourmand Legacy talent and rank; if rank detection fails, it labels the 15-minute-per-food fallback. Loading food counts remain partial, and active-buff time is separate.
 - Compares food bonuses with the active `Well Fed` XP buff; an equal or stronger buff suppresses reminders.
 - Sends configurable chat and screen reminders when the active buff is weaker than the best food bonus.
 - Sends a chat-only warning before an XP buff expires; the lead time defaults to 5 minutes and can be disabled in the options.
@@ -29,7 +31,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack-1.0.9.zip](ForeverSnackTrack-1.0.9.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.10.zip](ForeverSnackTrack-1.0.10.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat, resting, or flight, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
 4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.

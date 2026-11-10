@@ -1,19 +1,12 @@
-Forever SnackTrack reminds you to use the XP food in your bags. It reads the kill-XP bonus from food tooltips and compares it with your active buff. If the buff is missing or you have food with a better bonus, you'll get a reminder.
+Forever SnackTrack reminds you when XP food is in your bags and your active kill-XP buff is missing or weaker.
 
-- Chat reminders, a movable on-screen alert, or both.
-- A chat-only warning before the XP buff expires, with a configurable lead time.
-- Carried XP-food counts and estimated buff time, with the Gourmand Legacy talent identified and a labeled 15-minute fallback when rank detection is unavailable.
-- Eat the strongest available XP food from the alert, or choose another qualifying food from a dropdown showing XP and recognized stat bonuses.
-- Custom alert text, color, size, duration, and repeat interval.
-- Reminder size down to 25%, or a compact fixed icon with a pulsing gold glow, food information on hover, and eating/action controls.
-- Popup and icon reminders stay beneath ordinary UI windows, including the map and options.
-- Snooze reminders or dismiss the current alert.
-- Optional reminders to restock when you're out of XP food.
-- No reminders during combat. Resting areas are quiet by default, too.
-- At level 60, reminders stop. The on-screen alert hides while dead or flying and returns after resurrection or landing; chat reminders continue normally.
+- Chat reminders and an optional popup or fixed-icon alert.
+- A configurable chat warning before your XP buff expires.
+- Eat food from the alert or choose another qualifying food from a list.
+- Customize alert text, color, size, duration, and repeat interval.
+- Snooze or dismiss reminders, with an optional restock reminder.
+- Suppress reminders in combat and, by default, while resting. At level 60, reminders stop; the screen alert also hides while dead or flying.
 
 Works without setup. Open `/snacktrack` or `/fst` to change your preferences.
-
-Made for WoW Forever, with localized interface text and tooltip matching for standard WoW locales.
 
 Prefer WeakAuras? [Get the WeakAura version here](https://wago.io/GqIa5R4w7).

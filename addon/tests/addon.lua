@@ -414,6 +414,22 @@ eatState.items = {
 eatState.menuEntries[2].func()
 assert(eatNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Roasted Fish")
 assert(eatNs.alertFrame.selectedFoodID == 1 and #eatState.usedItems == 0)
+assert(eatNs.db.selectedFoodItemID == 1)
+local reloadedFoodNs, reloadedFoodState = setup(eatNs.db)
+reloadedFoodState.items = { { bagID = 0, slot = 1, itemID = 2, stackCount = 1 } }
+reloadedFoodNs.Scan()
+assert(reloadedFoodNs.alertFrame.selectedFoodID == 2)
+assert(reloadedFoodNs.db.selectedFoodItemID == 1)
+reloadedFoodState:event("BAG_UPDATE_DELAYED")
+assert(reloadedFoodNs.alertFrame.selectedFoodID == 2)
+assert(reloadedFoodNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use item 2")
+assert(reloadedFoodNs.db.selectedFoodItemID == 1)
+reloadedFoodState.items = {
+	{ bagID = 0, slot = 1, itemID = 2, stackCount = 1 },
+	{ bagID = 0, slot = 2, itemID = 1, stackCount = 1 },
+}
+reloadedFoodState:event("BAG_UPDATE_DELAYED")
+assert(reloadedFoodNs.alertFrame.selectedFoodID == 1)
 eatState.items = { { bagID = 0, slot = 2, itemID = 2, stackCount = 1 } }
 eatState.menuEntries[2].func()
 assert(eatNs.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Roasted Fish"
@@ -947,6 +963,8 @@ for rank = 0, 3 do
 	supply = ns.GetFoodSupply()
 	assert(supply.gourmandRank == rank and not supply.isFallback)
 	assert(supply.perServingSeconds == (15 + rank * 5) * 60)
+	local estimateText = ns.GetFoodSupplyText()
+	assert(estimateText:find(string.format("about %dm", 15 + rank * 5), 1, true))
 	local traitReads = state.traitReads
 	assert(ns.GetFoodSupply() == supply and state.traitReads == traitReads)
 	state.gourmandRank = (rank + 1) % 4
@@ -958,6 +976,13 @@ for rank = 0, 3 do
 	supply = ns.GetFoodSupply()
 	assert(supply.isFallback and supply.gourmandRank == nil and supply.perServingSeconds == 900)
 end
+ns, state = setup({ mockTraits = true, mockGourmandRank = 0 })
+state.items[1].stackCount = 5
+ns.Scan()
+assert(ns.GetFoodSupplyText():find("about 1h 15m", 1, true))
+state.items[1].stackCount = 8
+state:event("BAG_UPDATE_DELAYED")
+assert(ns.GetFoodSupplyText():find("about 2h", 1, true))
 ns, state = setup({ mockTraits = true })
 C_Traits.GetNodeInfo = function() error("Trait data unavailable") end
 supply = ns.GetFoodSupply()
@@ -972,8 +997,9 @@ for _, iconMode in ipairs({ false, true }) do
 	assert(frame.supplyText:IsShown() ~= iconMode)
 	if iconMode then
 		frame.eatButton.scripts.OnEnter()
-		assert(GameTooltip.lines[#GameTooltip.lines - 1] == "Gourmand Legacy talent: rank 2/3")
-		assert(GameTooltip.lines[#GameTooltip.lines] == "Estimated: 25 min per food.")
+		assert(table.concat(GameTooltip.lines, " "):find("Gourmand Legacy talent: rank 2/3", 1, true))
+		assert(table.concat(GameTooltip.lines, " "):find("Estimated: 25 min per food.", 1, true))
+		assert(table.concat(GameTooltip.lines, " "):find("no active XP buff", 1, true))
 	end
 	local bagReads, traitReads = state.bagReads, state.traitReads
 	for tick = 1, 60 do frame.scripts.OnUpdate(frame, 1 / 60) end
@@ -1007,6 +1033,27 @@ for _, iconMode in ipairs({ false, true }) do
 		assert(not table.concat(GameTooltip.lines, " "):find("Food supply:", 1, true))
 	end
 end
+ns, state = setup({ screenIconMode = true, screenDuration = 5 })
+state.auras = {
+	{ spellId = 50, name = "Well Fed", expirationTime = state.now + 8 * 60 },
+}
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Increases experience from kills by 3%" },
+} }
+ns.Scan()
+local comparisonReads = state.bagReads
+local auraComparisonReads = state.buffReads
+local unitAuraReads = state.auraReads
+ns.alertFrame.eatButton.scripts.OnEnter()
+assert(table.concat(GameTooltip.lines, " "):find("XP food: 5%; active XP buff: 3% (8m left).", 1, true))
+assert(state.bagReads == comparisonReads and state.buffReads == auraComparisonReads and state.auraReads == unitAuraReads)
+state.auras[1].expirationTime = state.now + 2 * 60
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Increases experience from kills by 2%" },
+} }
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(table.concat(GameTooltip.lines, " "):find("XP food: 5%; active XP buff: 2% (2m left).", 1, true))
 ns, state = setup()
 state.partial = true
 local loadingText = ns.GetFoodSupplyText()
@@ -1014,7 +1061,7 @@ assert(loadingText == ForeverSnackTrackL.foodSupplyLoading)
 state.partial = false
 state:event("BAG_UPDATE_DELAYED")
 local fallbackText, fallbackRank, fallbackDuration = ns.GetFoodSupplyText()
-assert(fallbackText:find("1 serving, about 0h 15m", 1, true))
+assert(fallbackText:find("1 serving, about 15m", 1, true))
 assert(fallbackRank == "Gourmand Legacy talent: rank unknown")
 assert(fallbackDuration == "Estimate: 15 min per food.")
 local carriedSeconds = ns.GetFoodSupply().seconds
