@@ -15,6 +15,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Suppresses reminders at level 60, the level cap. Players with XP locked can disable the addon.
 - Hides the on-screen reminder while dead or flying and restores it after resurrection or landing; chat reminders are unaffected.
 - Optionally reminds you when no qualifying food is in your bags.
+- Optionally reminds you when qualifying XP food falls to a per-character low-stock threshold; this one-shot warning is disabled by default and waits for a complete bag count.
 - Provides a movable screen alert with custom text, duration, size, and color.
 - Scales the reminder from 25% to 150%, with size and display mode saved per character.
 - Offers a fixed-icon alternative to the popup: hover for reminder and selected-food details, left-click to eat, or right-click for food selection, snooze, and dismiss. Drag the icon to reposition it. Both modes use the same reminder visibility rules.
@@ -31,10 +32,10 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack-1.0.10.zip](ForeverSnackTrack-1.0.10.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.11.zip](ForeverSnackTrack-1.0.11.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat, resting, or flight, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
-4. Run `/fst debug` to print recognized XP food, active XP buffs, and relevant tooltip candidates to chat.
+4. Run `/fst debug` to print the low-stock threshold, recognized XP food and serving-count completeness, active XP buffs, and relevant tooltip candidates to chat.
 
 The addon targets interface `16001`. The game client must provide the Retail APIs used by the addon, including item classification through `C_Item.GetItemInfoInstant` or `GetItemInfoInstant`. Missing classification or loading tooltip data is treated as unresolved rather than as proof that no XP food exists.
 

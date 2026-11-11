@@ -6,12 +6,27 @@ local function setAlertPosition(frame)
 	frame:SetPoint("CENTER", UIParent, "CENTER", ns.db.alertOffsetX / scale, ns.db.alertOffsetY / scale)
 end
 
-local function updateAlertAppearance(frame)
+local function updateAlertAppearance(frame, preservePosition)
 	local color = ns.db.screenColor
 	local iconMode = ns.db.screenIconMode
-	frame:SetSize(iconMode and 48 or 460, iconMode and 48 or 148)
+	local textHeight = type(frame.messageHeight) == "number" and frame.messageHeight or 64
+	local lowFoodText = type(frame.lowFoodStatusText) == "string" and frame.lowFoodStatusText or nil
+	frame.lowFoodText:SetText(lowFoodText or "")
+	local measuredLowFoodHeight = frame.lowFoodText.GetStringHeight and frame.lowFoodText:GetStringHeight()
+	local lowFoodTextHeight = lowFoodText
+		and math.max(22, type(measuredLowFoodHeight) == "number" and measuredLowFoodHeight + 4 or 22) or 0
+	frame:SetSize(iconMode and 48 or 460, iconMode and 48 or textHeight + 84 + lowFoodTextHeight)
 	frame.text:SetShown(not iconMode)
+	frame.text:SetHeight(textHeight)
+	frame.lowFoodText:SetHeight(math.max(18, lowFoodTextHeight - 4))
+	frame.lowFoodText:SetShown(not iconMode and not frame.isPreview and lowFoodText ~= nil)
+	frame.lowFoodText:ClearAllPoints()
+	if lowFoodText then
+		frame.lowFoodText:SetPoint("TOP", frame, "TOP", 0, -(textHeight + 20))
+	end
 	frame.supplyText:SetShown(not iconMode and not frame.isPreview)
+	frame.supplyText:ClearAllPoints()
+	frame.supplyText:SetPoint("TOP", frame, "TOP", 0, -(textHeight + 20 + lowFoodTextHeight))
 	frame.iconTexture:SetShown(iconMode)
 	if iconMode then
 		frame.iconGlow:Show()
@@ -36,7 +51,9 @@ local function updateAlertAppearance(frame)
 		frame.eatDropdownButton:SetShown(not frame.isPreview and frame.hasFood)
 	end
 	frame:SetScale(ns.db.screenScale)
-	setAlertPosition(frame)
+	if not preservePosition then
+		setAlertPosition(frame)
+	end
 	frame.text:SetTextColor(color.r, color.g, color.b)
 	frame:SetBackdropBorderColor(color.r, color.g, color.b, 0.9)
 end
@@ -113,6 +130,10 @@ local function showIconTooltip(frame)
 		GameTooltip:AddLine(summary, 1, 0.85, 0.3, true)
 		GameTooltip:AddLine(rankDetail, 0.8, 0.8, 0.8, true)
 		GameTooltip:AddLine(durationDetail, 0.8, 0.8, 0.8, true)
+		local lowFoodStatusText = ns.GetLowFoodStatusText and ns.GetLowFoodStatusText()
+		if lowFoodStatusText then
+			GameTooltip:AddLine(lowFoodStatusText, 1, 0.85, 0.3, true)
+		end
 		GameTooltip:AddLine(ns.GetFoodBuffComparisonText(), 0.8, 0.8, 0.8, true)
 	end
 	GameTooltip:Show()
@@ -163,6 +184,10 @@ local function createAlertFrame()
 	frame.text:SetHeight(64)
 	frame.text:SetJustifyH("CENTER")
 	frame.text:SetWordWrap(true)
+	frame.lowFoodText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	frame.lowFoodText:SetWidth(420)
+	frame.lowFoodText:SetHeight(18)
+	frame.lowFoodText:SetJustifyH("CENTER")
 	frame.supplyText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	frame.supplyText:SetPoint("TOP", frame, "TOP", 0, -84)
 	frame.supplyText:SetWidth(420)
@@ -310,7 +335,7 @@ local function createAlertFrame()
 	return frame
 end
 
-function ns.ShowScreenAlert(message, isPreview)
+function ns.ShowScreenAlert(message, isPreview, lowFoodStatusText)
 	if not ns.db then
 		return false
 	end
@@ -325,6 +350,9 @@ function ns.ShowScreenAlert(message, isPreview)
 		displayMessage = string.format(ForeverSnackTrackL.chatMessage, 5)
 	end
 	frame.text:SetText(displayMessage)
+	local measuredTextHeight = frame.text.GetStringHeight and frame.text:GetStringHeight()
+	frame.messageHeight = math.max(64, type(measuredTextHeight) == "number" and measuredTextHeight + 12 or 64)
+	frame.lowFoodStatusText = type(lowFoodStatusText) == "string" and lowFoodStatusText or nil
 	frame.isPreview = not not isPreview
 	frame.hasFood = false
 	frame.eatButton:SetAttribute("type", nil)
@@ -378,6 +406,15 @@ function ns.RefreshAlertMode()
 		if GameTooltip and GameTooltip:IsOwned(ns.alertFrame.eatButton) then GameTooltip:Hide() end
 		if CloseDropDownMenus then CloseDropDownMenus() end
 	end
+end
+
+function ns.SetLowFoodStatusText(text)
+	local frame = ns.alertFrame
+	if not frame or frame.isPreview then
+		return
+	end
+	frame.lowFoodStatusText = type(text) == "string" and text or nil
+	updateAlertAppearance(frame, true)
 end
 
 function ns.HideScreenAlert(preservePreview)
