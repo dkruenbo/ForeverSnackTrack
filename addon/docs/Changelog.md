@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.11 - 2026-11-11
+
+### Player-facing
+
+- Add an optional per-character low-stock reminder threshold for qualifying XP food, disabled by default; notify once when stock reaches the threshold and re-arm after stock rises above it.
+
+### Technical
+
+- Reuse the existing bag scan and suppress low-stock notices while any recognized XP buff is active; incomplete food counts never trigger the notice. Include threshold, known serving count, and count completeness in `/fst debug`.
+- Prompt players to restock XP food on its own popup and chat lines, independent of custom screen text; show the same warning in the icon tooltip only at or below the threshold.
+- Avoid duplicating the no-food alert with a low-stock notice when both options are enabled.
+
 ## 1.0.10 - 2026-11-10
 
 ### Player-facing

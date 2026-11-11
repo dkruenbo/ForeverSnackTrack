@@ -4,6 +4,7 @@ local defaults = {
 	chatAlerts = true,
 	screenAlerts = true,
 	remindWhenNoFood = false,
+	lowFoodThreshold = 0,
 	remindWhileResting = false,
 	repeatReminders = true,
 	reminderMinutes = 1,
@@ -32,6 +33,7 @@ local tooltipCacheTime
 local lastReminderTime
 local reminderState
 local dismissedReminderState
+local lowStockNotified = false
 local snoozeUntil
 local scanTicker
 local auraScanPending = false
@@ -182,6 +184,12 @@ local function initializeSettings()
 
 	ForeverSnackTrackCharDB.reminderMinutes = math.max(1,
 		math.min(60, math.floor(ForeverSnackTrackCharDB.reminderMinutes)))
+	local lowFoodThreshold = ForeverSnackTrackCharDB.lowFoodThreshold
+	if type(lowFoodThreshold) ~= "number" or lowFoodThreshold ~= lowFoodThreshold then
+		lowFoodThreshold = defaults.lowFoodThreshold
+	end
+	ForeverSnackTrackCharDB.lowFoodThreshold = math.max(0, math.min(20,
+		math.floor(lowFoodThreshold + 0.5)))
 	local buffExpiryWarningMinutes = ForeverSnackTrackCharDB.buffExpiryWarningMinutes
 	if type(buffExpiryWarningMinutes) ~= "number" or buffExpiryWarningMinutes ~= buffExpiryWarningMinutes then
 		buffExpiryWarningMinutes = defaults.buffExpiryWarningMinutes
@@ -601,6 +609,29 @@ function ns.GetFoodSupplyText()
 	return message, rankDetail, durationDetail
 end
 
+function ns.GetLowFoodStatusText()
+	local threshold = ns.db and ns.db.lowFoodThreshold or 0
+	if threshold <= 0 then
+		return nil
+	end
+	local supply = ns.GetFoodSupply()
+	if not supply.complete or supply.count > threshold then
+		return nil
+	end
+	if supply.count == 0 and ns.db.remindWhenNoFood then
+		return nil
+	end
+	local buff = cachedBuffStatus
+	if not buff or not buff.complete or (type(buff.bonusPercent) == "number" and buff.bonusPercent > 0) then
+		return nil
+	end
+	return ForeverSnackTrackL.lowFoodTitle
+end
+
+function ns.ResetLowStockReminder()
+	lowStockNotified = false
+end
+
 function ns.GetFoodBuffComparisonText()
 	local supply = cachedFoodSupply
 	local buff = cachedBuffStatus
@@ -759,10 +790,10 @@ local function warnAboutBuffExpiry(bonusPercent, expirationTime, spellID, now)
 		ForeverSnackTrackL.buffExpiryMessage, bonusPercent, math.ceil(remaining / 60)))
 end
 
-local function sendReminder(message, useCustomScreenMessage)
+local function sendReminder(message, useCustomScreenMessage, lowFoodStatusText, chatMessage)
 	local sent = false
 	if ns.db.chatAlerts and DEFAULT_CHAT_FRAME then
-		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack:|r " .. message)
+		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack:|r " .. (chatMessage or message))
 		sent = true
 	end
 	if ns.db.screenAlerts and ns.ShowScreenAlert
@@ -770,7 +801,7 @@ local function sendReminder(message, useCustomScreenMessage)
 		and not isPlayerFlying()
 		and not (ns.alertFrame and ns.alertFrame.isPreview and ns.alertFrame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
-		sent = ns.ShowScreenAlert(screenMessage) or sent
+		sent = ns.ShowScreenAlert(screenMessage, false, lowFoodStatusText) or sent
 	end
 	return sent
 end
@@ -827,8 +858,13 @@ function ns.Scan()
 
 	local hasFood = hasQualifyingFood()
 	local requiredBonusPercent = type(hasFood) == "number" and hasFood or nil
+	local lowFoodThreshold = ns.db.lowFoodThreshold
+	local foodSupply = lowFoodThreshold > 0 and ns.GetFoodSupply() or nil
+	if lowFoodThreshold == 0 or (foodSupply and foodSupply.complete and foodSupply.count > lowFoodThreshold) then
+		lowStockNotified = false
+	end
 	local hasBuff, buffExpirationTime, buffSpellID, knownBuffPercent
-	if hasFood or ns.db.remindWhenNoFood or ns.db.buffExpiryWarningMinutes > 0 then
+	if hasFood or ns.db.remindWhenNoFood or lowFoodThreshold > 0 or ns.db.buffExpiryWarningMinutes > 0 then
 		hasBuff, buffExpirationTime, buffSpellID, knownBuffPercent = hasExperienceBuff(requiredBonusPercent)
 		cachedBuffStatus = {
 			complete = hasBuff ~= nil,
@@ -838,12 +874,25 @@ function ns.Scan()
 	end
 	warnAboutBuffExpiry(knownBuffPercent or (type(hasBuff) == "number" and hasBuff),
 		buffExpirationTime, buffSpellID, now)
+	local lowFoodStatusText = lowFoodThreshold > 0 and ns.GetLowFoodStatusText() or nil
+	if ns.SetLowFoodStatusText then
+		ns.SetLowFoodStatusText(lowFoodStatusText)
+	end
 	if hasFood == nil then
 		return
 	end
+	local lowStock = foodSupply and foodSupply.complete and foodSupply.count <= lowFoodThreshold
+	if lowStock and hasBuff == nil then
+		return
+	end
+	local lowStockReminder = lowStock
+		and not (foodSupply.count == 0 and ns.db.remindWhenNoFood)
+		and not (type(hasBuff) == "number" and hasBuff > 0)
+	local lowStockNoticeDue = lowStockReminder and not lowStockNotified
 
 	local state
 	local message
+	local chatMessage
 	local useCustomScreenMessage = false
 	if hasFood then
 		if hasBuff == nil then
@@ -874,6 +923,9 @@ function ns.Scan()
 		end
 		state = "missing-food"
 		message = ForeverSnackTrackL.noFoodMessage
+	elseif lowStockReminder then
+		state = "low-food-stock"
+		message = ForeverSnackTrackL.lowFoodTitle
 	else
 		lastReminderTime = nil
 		reminderState = nil
@@ -882,6 +934,10 @@ function ns.Scan()
 			ns.HideScreenAlert(true)
 		end
 		return
+	end
+	if lowStockNoticeDue then
+		chatMessage = state == "low-food-stock" and lowFoodStatusText
+			or message .. "\n" .. lowFoodStatusText
 	end
 
 	if reminderState ~= state then
@@ -903,9 +959,13 @@ function ns.Scan()
 	end
 	local intervalElapsed = lastReminderTime
 		and now - lastReminderTime >= ns.db.reminderMinutes * 60
-	if not lastReminderTime or (ns.db.repeatReminders and intervalElapsed) then
-		if sendReminder(message, useCustomScreenMessage) then
+	if lowStockNoticeDue or not lastReminderTime
+		or (state ~= "low-food-stock" and ns.db.repeatReminders and intervalElapsed) then
+		if sendReminder(message, useCustomScreenMessage, lowFoodStatusText, chatMessage) then
 			lastReminderTime = now
+			if lowStockNoticeDue then
+				lowStockNotified = true
+			end
 		end
 	end
 	local frame = ns.alertFrame
@@ -917,7 +977,7 @@ function ns.Scan()
 		and (ns.db.screenDuration == 0 or remaining > 0)
 		and not (frame and frame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
-		ns.ShowScreenAlert(screenMessage)
+		ns.ShowScreenAlert(screenMessage, false, lowFoodStatusText)
 		if remaining and ns.alertFrame then
 			ns.alertFrame.remaining = remaining
 		end
@@ -1031,6 +1091,10 @@ function ns.DebugStatus()
 	if unresolvedItems > 0 then
 		debugPrint(string.format("%d item tooltip(s) unavailable; known XP food can still trigger reminders.", unresolvedItems))
 	end
+	local supply = ns.GetFoodSupply()
+	local threshold = ns.db.lowFoodThreshold == 0 and "disabled" or tostring(ns.db.lowFoodThreshold)
+	debugPrint(string.format("Low-stock threshold: %s; qualifying food count: %d (%s).",
+		threshold, supply.count, supply.complete and "complete" or "partial"))
 	if recognizedFoods == 0 then
 		debugPrint(string.format("No XP food recognized in %d carried item(s).", scannedItems))
 	else

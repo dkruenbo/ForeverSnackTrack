@@ -57,6 +57,9 @@ local function setup(settings, accountSettings, legacySettings)
 	function methods:SetAlpha(alpha) self.alpha = alpha end
 	function methods:SetText(text) self.textValue = text end
 	function methods:GetText() return rawget(self, "textValue") or "" end
+	function methods:GetStringHeight()
+		return math.max(20, math.ceil(#self:GetText() / 40) * 20)
+	end
 	function methods:SetChecked(value) self.checked = value end
 	function methods:GetChecked() return self.checked end
 	function methods:SetValue(value)
@@ -569,6 +572,89 @@ assert(state.chats == 1 and state.bagReads == 1)
 state:event("GET_ITEM_INFO_RECEIVED", 1)
 assert(state.chats == 2 and state.bagReads == 2)
 
+ns, state = setup({ lowFoodThreshold = 1, screenMessage = "Custom screen alert" })
+ns.Scan()
+assert(state.chats == 1 and state.messages[1]:find("Low stock: Restock XP food.", 1, true))
+assert(state.messages[1]:find("\nLow stock: Restock XP food.", 1, true))
+assert(ns.alertFrame.text:GetText() == "Custom screen alert")
+assert(ns.alertFrame.lowFoodText:GetText() == "Low stock: Restock XP food.")
+assert(ns.alertFrame.size[2] > 148)
+local alertPosition = ns.alertFrame.point
+ns.SetLowFoodStatusText("Low stock: Restock XP food.")
+assert(ns.alertFrame.point == alertPosition)
+state.now = 160
+ns.Scan()
+assert(state.chats == 2 and not state.messages[2]:find("Low stock: Restock XP food.", 1, true))
+state.items[1].stackCount = 2
+state:event("BAG_UPDATE_DELAYED")
+assert(state.chats == 2)
+assert(ns.alertFrame.lowFoodText:GetText() == "")
+state.items[1].stackCount = 1
+state:event("BAG_UPDATE_DELAYED")
+assert(state.chats == 3 and state.messages[3]:find("Low stock: Restock XP food.", 1, true))
+assert(ns.alertFrame.lowFoodText:GetText() == "Low stock: Restock XP food.")
+ns.optionsPanel.lowFoodThresholdSlider:SetValue(2)
+ns.optionsPanel.lowFoodThresholdSlider.scripts.OnMouseUp()
+assert(state.chats == 4 and state.messages[4]:find("Low stock: Restock XP food.", 1, true))
+
+ns, state = setup({ screenIconMode = true, lowFoodThreshold = 2 })
+assert(ns.db.screenIconMode and not ns.alertFrame)
+ns.Scan()
+assert(state.chats == 1 and state.messages[1]:find("Low stock: Restock XP food.", 1, true))
+ns.alertFrame.eatButton.scripts.OnEnter()
+local iconTooltipText = table.concat(GameTooltip.lines, "\n")
+assert(iconTooltipText:find("Low stock: Restock XP food.", 1, true), iconTooltipText)
+
+ns, state = setup({ lowFoodThreshold = 2 })
+state.items = {
+	{ bagID = 0, slot = 1, itemID = 1, stackCount = 1 },
+	{ bagID = 0, slot = 2, itemID = 2, stackCount = 1 },
+}
+state.foodTooltips[2] = { lines = { { leftText = "Loading food" } } }
+ns.Scan()
+assert(state.chats == 1 and not state.messages[1]:find("Low stock: Restock XP food.", 1, true))
+assert(ns.alertFrame.lowFoodText:GetText() == "")
+
+ns, state = setup({ lowFoodThreshold = 2 })
+state.empty = true
+ns.Scan()
+assert(state.chats == 1 and state.messages[1]:find("Low stock: Restock XP food.", 1, true))
+assert(ns.alertFrame.lowFoodText:GetText() == "Low stock: Restock XP food.")
+state.now = 160
+ns.Scan()
+assert(state.chats == 1)
+
+ns, state = setup({ lowFoodThreshold = 1 })
+state.empty = true
+ns.Scan()
+assert(ns.alertFrame.lowFoodText:GetText() == "Low stock: Restock XP food.")
+
+ns, state = setup({ lowFoodThreshold = 2, remindWhenNoFood = true })
+state.empty = true
+ns.Scan()
+assert(state.chats == 1 and state.messages[1]:find("No XP food is in your bags", 1, true))
+assert(not state.messages[1]:find("Low stock: Restock XP food.", 1, true))
+assert(ns.alertFrame.lowFoodText:GetText() == "")
+
+ns, state = setup({ lowFoodThreshold = 2 })
+state.buff = "Well Fed"
+state.buffTooltips[1] = { lines = {
+	{ leftText = "Well Fed" }, { leftText = "Increases experience from kills by 5%" },
+} }
+ns.Scan()
+assert(state.chats == 0)
+assert(not ns.alertFrame or ns.alertFrame.lowFoodText:GetText() == "")
+state.buff = nil
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(state.chats == 1 and state.messages[1]:find("Low stock: Restock XP food.", 1, true),
+	table.concat(state.messages, " | ") .. " (" .. state.chats .. " chat message(s))")
+
+ns, state = setup({ lowFoodThreshold = 1 })
+ns.DebugStatus()
+local debugOutput = table.concat(state.messages, "\n")
+assert(debugOutput:find("Low-stock threshold: 1; qualifying food count: 1 (complete).", 1, true), debugOutput)
+
 ns, state = setup({ remindWhenNoFood = true })
 ITEM_SPELL_TRIGGER_ONUSE = "Use: %s"
 state.foodTooltips[1] = { lines = {
@@ -682,6 +768,11 @@ assert(ForeverSnackTrackL.noFoodOption == ForeverSnackTrackLocales.enUS.noFoodOp
 
 ns, state = setup()
 assert(ns.db.buffExpiryWarningMinutes == 5)
+assert(ns.db.lowFoodThreshold == 0)
+assert(ns.optionsPanel.supplyText.point[4] == 340 and ns.optionsPanel.supplyText.point[5] == -180)
+ns.optionsPanel.lowFoodThresholdSlider:SetValue(4)
+assert(ns.db.lowFoodThreshold == 4)
+assert(ns.optionsPanel.lowFoodThresholdSlider.scripts.OnMouseUp)
 ns.optionsPanel.buffExpirySlider:SetValue(1)
 assert(ns.db.buffExpiryWarningMinutes == 1)
 ns.optionsPanel.buffExpirySlider:SetValue(5)

@@ -8,6 +8,13 @@ local function makeCheckbox(parent, name, label, y)
 	return checkbox
 end
 
+local function makeSectionLabel(parent, label, y)
+	local sectionLabel = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	sectionLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 24, y)
+	sectionLabel:SetText(label)
+	return sectionLabel
+end
+
 local function refreshOptions()
 	local panel = ns.optionsPanel
 	if not panel or not ns.db then
@@ -20,6 +27,7 @@ local function refreshOptions()
 	panel.noFoodCheckbox:SetChecked(ns.db.remindWhenNoFood)
 	panel.restingCheckbox:SetChecked(ns.db.remindWhileResting)
 	panel.repeatCheckbox:SetChecked(ns.db.repeatReminders)
+	panel.lowFoodThresholdSlider:SetValue(ns.db.lowFoodThreshold)
 	panel.intervalSlider:SetValue(ns.db.reminderMinutes)
 	panel.intervalSlider:SetEnabled(ns.db.repeatReminders)
 	panel.buffExpirySlider:SetValue(ns.db.buffExpiryWarningMinutes)
@@ -60,6 +68,7 @@ function ns.InitializeOptions()
 	description:SetJustifyH("LEFT")
 	description:SetText(L.description)
 
+	panel.remindersSection = makeSectionLabel(panel, L.remindersSection, -82)
 	panel.chatCheckbox = makeCheckbox(panel, "ForeverSnackTrackChatCheckbox", L.chatOption, -105)
 	panel.screenCheckbox = makeCheckbox(panel, "ForeverSnackTrackScreenCheckbox", L.screenOption, -135)
 	panel.repeatCheckbox = makeCheckbox(panel, "ForeverSnackTrackRepeatCheckbox", L.repeatOption, -165)
@@ -98,8 +107,9 @@ function ns.InitializeOptions()
 		ns.Scan()
 	end)
 
+	panel.timingSection = makeSectionLabel(panel, L.reminderTimingSection, -250)
 	local intervalLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	intervalLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -265)
+	intervalLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -272)
 	intervalLabel:SetText(string.format(L.interval, ns.db.reminderMinutes))
 
 	panel.intervalSlider = CreateFrame("Slider", "ForeverSnackTrackIntervalSlider", panel, "OptionsSliderTemplate")
@@ -115,7 +125,10 @@ function ns.InitializeOptions()
 	end)
 
 	local buffExpiryLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	buffExpiryLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -330)
+	buffExpiryLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -337)
+	buffExpiryLabel:SetWidth(270)
+	buffExpiryLabel:SetJustifyH("LEFT")
+	buffExpiryLabel:SetWordWrap(true)
 	buffExpiryLabel:SetText(string.format(L.buffExpiryWarning, ns.db.buffExpiryWarningMinutes))
 
 	panel.buffExpirySlider = CreateFrame("Slider", "ForeverSnackTrackBuffExpirySlider", panel, "OptionsSliderTemplate")
@@ -133,8 +146,42 @@ function ns.InitializeOptions()
 		ns.Scan()
 	end)
 
+	local lowFoodThresholdLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	lowFoodThresholdLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -337)
+	lowFoodThresholdLabel:SetWidth(260)
+	lowFoodThresholdLabel:SetJustifyH("LEFT")
+	lowFoodThresholdLabel:SetWordWrap(true)
+	local function updateLowFoodThresholdLabel(threshold)
+		local value
+		if threshold == 0 then
+			value = L.lowFoodThresholdDisabled
+		else
+			local template = threshold == 1 and L.lowFoodThresholdSingle or L.lowFoodThresholdServings
+			value = string.format(template, threshold)
+		end
+		lowFoodThresholdLabel:SetText(string.format(L.lowFoodThreshold, value))
+	end
+	panel.lowFoodThresholdSlider = CreateFrame("Slider", "ForeverSnackTrackLowFoodThresholdSlider", panel,
+		"OptionsSliderTemplate")
+	panel.lowFoodThresholdSlider:SetPoint("TOPLEFT", lowFoodThresholdLabel, "BOTTOMLEFT", 0, -12)
+	panel.lowFoodThresholdSlider:SetMinMaxValues(0, 20)
+	panel.lowFoodThresholdSlider:SetValueStep(1)
+	panel.lowFoodThresholdSlider:SetObeyStepOnDrag(true)
+	panel.lowFoodThresholdSlider:SetWidth(260)
+	panel.lowFoodThresholdSlider:SetScript("OnValueChanged", function(_, value)
+		local threshold = math.floor(value + 0.5)
+		if threshold ~= ns.db.lowFoodThreshold and ns.ResetLowStockReminder then
+			ns.ResetLowStockReminder()
+		end
+		ns.db.lowFoodThreshold = threshold
+		updateLowFoodThresholdLabel(threshold)
+	end)
+	panel.lowFoodThresholdSlider:SetScript("OnMouseUp", function()
+		ns.Scan()
+	end)
+
 	local snoozeLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	snoozeLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -265)
+	snoozeLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -272)
 	snoozeLabel:SetText(L.snoozeOption)
 
 	panel.snoozeDropdown = CreateFrame("Frame", "ForeverSnackTrackSnoozeDropdown", panel, "UIDropDownMenuTemplate")
@@ -142,6 +189,7 @@ function ns.InitializeOptions()
 	if UIDropDownMenu_SetWidth then
 		UIDropDownMenu_SetWidth(panel.snoozeDropdown, 105)
 	end
+	updateLowFoodThresholdLabel(ns.db.lowFoodThreshold)
 	if UIDropDownMenu_Initialize and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
 		UIDropDownMenu_Initialize(panel.snoozeDropdown, function(_, level)
 			for _, minutes in ipairs({ 1, 5, 10, 15, 30, 60 }) do
@@ -163,7 +211,7 @@ function ns.InitializeOptions()
 	end
 
 	local messageLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	messageLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -390)
+	messageLabel:SetPoint("TOPLEFT", panel, "TOPLEFT", 48, -402)
 	messageLabel:SetText(L.screenMessageLabel)
 
 	local messageHint = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
@@ -269,8 +317,8 @@ function ns.InitializeOptions()
 		ns.ResetScreenAlertPosition()
 	end)
 	panel.supplyText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	panel.supplyText:SetPoint("TOPLEFT", colorLabel, "BOTTOMLEFT", 0, -24)
-	panel.supplyText:SetWidth(560)
+	panel.supplyText:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -180)
+	panel.supplyText:SetWidth(300)
 	panel.supplyText:SetJustifyH("LEFT")
 	panel.supplyText:SetWordWrap(true)
 
