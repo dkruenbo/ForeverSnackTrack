@@ -9,4 +9,6 @@ Forever SnackTrack reminds you when XP food is in your bags and your active kill
 
 Works without setup. Open `/snacktrack` or `/fst` to change your preferences.
 
+Tracking for the Cozy Sleeping Bag's Well-Rested buff, including a timer while resting in the bag, has been added. This feature is still being tested and needs broader in-game testing.
+
 Prefer WeakAuras? [Get the WeakAura version here](https://wago.io/GqIa5R4w7).

@@ -29,6 +29,8 @@ local function updateAlertAppearance(frame, preservePosition)
 	frame.supplyText:SetPoint("TOP", frame, "TOP", 0, -(textHeight + 20 + lowFoodTextHeight))
 	frame.iconTexture:SetShown(iconMode)
 	if iconMode then
+		local icon = frame.alertKind == "sleeping-bag" and ns.GetSleepingBagIcon and ns.GetSleepingBagIcon()
+		frame.iconTexture:SetTexture(icon or "Interface\\Icons\\INV_Misc_Food_15")
 		frame.iconGlow:Show()
 	else
 		frame.iconGlow:Hide()
@@ -44,10 +46,11 @@ local function updateAlertAppearance(frame, preservePosition)
 	else
 		frame.eatButton:SetSize(96, 24)
 		frame.eatButton:SetPoint("RIGHT", frame.snoozeButton, "LEFT", -36, 0)
-		frame.eatButton:SetText(ForeverSnackTrackL.eatButton)
+		frame.eatButton:SetText(frame.hasSleepingBagAction and ForeverSnackTrackL.sleepingBagUseButton
+			or ForeverSnackTrackL.eatButton)
 		frame.snoozeButton:SetShown(not frame.isPreview)
 		frame.dismissButton:SetShown(not frame.isPreview)
-		frame.eatButton:SetShown(not frame.isPreview and frame.hasFood)
+		frame.eatButton:SetShown(not frame.isPreview and (frame.hasFood or frame.hasSleepingBagAction))
 		frame.eatDropdownButton:SetShown(not frame.isPreview and frame.hasFood)
 	end
 	frame:SetScale(ns.db.screenScale)
@@ -81,7 +84,7 @@ end
 
 function ns.RefreshSelectedFood()
 	local frame = ns.alertFrame
-	if not frame or not ns.db or not frame:IsShown() or frame.isPreview
+	if not frame or not ns.db or not frame:IsShown() or frame.isPreview or frame.alertKind ~= "food"
 		or (InCombatLockdown and InCombatLockdown()) then
 		return
 	end
@@ -116,7 +119,7 @@ local function showIconTooltip(frame)
 	GameTooltip:SetOwner(frame.eatButton, "ANCHOR_RIGHT")
 	GameTooltip:SetText("Forever SnackTrack")
 	GameTooltip:AddLine(frame.text:GetText(), 1, 1, 1, true)
-	if not frame.isPreview then
+	if not frame.isPreview and frame.alertKind ~= "sleeping-bag" then
 		for _, food in ipairs(ns.GetAvailableFoods and ns.GetAvailableFoods() or {}) do
 			if food.itemID == frame.selectedFoodID then
 				GameTooltip:AddLine(string.format("%s (%d%%) x%d", food.itemName, food.bonusPercent, food.count), 1, 1, 1, true)
@@ -234,6 +237,9 @@ local function createAlertFrame()
 		if GameTooltip and GameTooltip:IsOwned(frame.eatButton) then GameTooltip:Hide() end
 	end)
 	frame.eatButton:SetScript("PostClick", function(_, mouseButton)
+		if frame.alertKind == "sleeping-bag" then
+			return
+		end
 		if mouseButton == "RightButton" and ns.db.screenIconMode and not frame.isPreview
 			and ToggleDropDownMenu and UIDropDownMenu_Initialize
 			and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
@@ -335,7 +341,7 @@ local function createAlertFrame()
 	return frame
 end
 
-function ns.ShowScreenAlert(message, isPreview, lowFoodStatusText)
+function ns.ShowScreenAlert(message, isPreview, lowFoodStatusText, showFoodActions, sleepingBagItemName)
 	if not ns.db then
 		return false
 	end
@@ -353,8 +359,10 @@ function ns.ShowScreenAlert(message, isPreview, lowFoodStatusText)
 	local measuredTextHeight = frame.text.GetStringHeight and frame.text:GetStringHeight()
 	frame.messageHeight = math.max(64, type(measuredTextHeight) == "number" and measuredTextHeight + 12 or 64)
 	frame.lowFoodStatusText = type(lowFoodStatusText) == "string" and lowFoodStatusText or nil
+	frame.alertKind = showFoodActions == false and "sleeping-bag" or "food"
 	frame.isPreview = not not isPreview
 	frame.hasFood = false
+	frame.hasSleepingBagAction = false
 	frame.eatButton:SetAttribute("type", nil)
 	frame.eatButton:SetAttribute("type1", nil)
 	frame.eatButton:SetAttribute("macrotext", nil)
@@ -369,20 +377,33 @@ function ns.ShowScreenAlert(message, isPreview, lowFoodStatusText)
 		frame.dismissButton:SetText(ForeverSnackTrackL.dismissButton)
 		frame.snoozeButton:Show()
 		frame.dismissButton:Show()
-		local foods = ns.GetAvailableFoods and ns.GetAvailableFoods() or {}
-		if #foods > 0 then
-			frame.hasFood = true
-			if not frame.selectedFoodID and ns.db.selectedFoodItemID > 0 then
-				frame.selectedFoodID = ns.db.selectedFoodItemID
-			end
-			if not frame.selectedFoodID or not setEatFood(frame, frame.selectedFoodID) then
-				setEatFood(frame, foods[1].itemID)
-			end
+		if frame.alertKind == "sleeping-bag" and type(sleepingBagItemName) == "string"
+			and sleepingBagItemName ~= "" and not (InCombatLockdown and InCombatLockdown()) then
+			local macroText = "/use " .. sleepingBagItemName
+			frame.eatButton:SetAttribute("type", "macro")
+			frame.eatButton:SetAttribute("macrotext", macroText)
+			frame.eatButton:SetAttribute("type1", "macro")
+			frame.eatButton:SetAttribute("macrotext1", macroText)
+			frame.eatButton:SetAttribute("type2", "none")
+			frame.hasSleepingBagAction = true
 			frame.eatButton:Show()
-			frame.eatDropdownButton:Show()
-		else
-			frame.eatButton:Hide()
 			frame.eatDropdownButton:Hide()
+		else
+			local foods = showFoodActions == false and {} or (ns.GetAvailableFoods and ns.GetAvailableFoods() or {})
+			if #foods > 0 then
+				frame.hasFood = true
+				if not frame.selectedFoodID and ns.db.selectedFoodItemID > 0 then
+					frame.selectedFoodID = ns.db.selectedFoodItemID
+				end
+				if not frame.selectedFoodID or not setEatFood(frame, frame.selectedFoodID) then
+					setEatFood(frame, foods[1].itemID)
+				end
+				frame.eatButton:Show()
+				frame.eatDropdownButton:Show()
+			else
+				frame.eatButton:Hide()
+				frame.eatDropdownButton:Hide()
+			end
 		end
 	end
 	updateAlertAppearance(frame)

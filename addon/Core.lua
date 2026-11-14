@@ -5,6 +5,7 @@ local defaults = {
 	screenAlerts = true,
 	remindWhenNoFood = false,
 	lowFoodThreshold = 0,
+	trackSleepingBagBuff = false,
 	remindWhileResting = false,
 	repeatReminders = true,
 	reminderMinutes = 1,
@@ -19,16 +20,8 @@ local defaults = {
 	alertOffsetY = 120,
 }
 
-local foodTooltipCache = {}
-local foodStatsCache = {}
 local auraTooltipCache = {}
-local cachedBagResult
-local cachedQualifyingFoods
-local cachedFoodScanComplete = false
-local cachedFoodSupply
 local cachedBuffStatus
-local gourmandScanComplete = false
-local cachedGourmandRank
 local tooltipCacheTime
 local lastReminderTime
 local reminderState
@@ -62,6 +55,7 @@ local function normalizeTooltipText(text)
 	end
 	return text
 end
+ns.NormalizeTooltipText = normalizeTooltipText
 
 local function containsAny(text, terms)
 	for _, term in ipairs(terms) do
@@ -71,6 +65,7 @@ local function containsAny(text, terms)
 	end
 	return false
 end
+ns.ContainsAny = containsAny
 
 local function hasExperienceKillContext(text)
 	return containsAny(text, ForeverSnackTrackL.experienceTerms)
@@ -106,6 +101,7 @@ end
 local function tooltipLineText(line)
 	return table.concat({ line.leftText or "", line.rightText or "" }, " ")
 end
+ns.TooltipLineText = tooltipLineText
 
 local function hasItemUseDescription(tooltipData)
 	if type(ITEM_SPELL_TRIGGER_ONUSE) ~= "string" then
@@ -124,6 +120,7 @@ local function hasItemUseDescription(tooltipData)
 	end
 	return false
 end
+ns.HasItemUseDescription = hasItemUseDescription
 
 local function hasLoadedSpellDescription(spellID)
 	if not spellID or not C_Spell or not C_Spell.GetSpellDescription then
@@ -153,6 +150,7 @@ local function debugPrint(message)
 		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack debug:|r " .. message)
 	end
 end
+ns.DebugPrint = debugPrint
 
 local function copySettings(source)
 	local settings = {}
@@ -281,306 +279,7 @@ local function tooltipExperienceBonusPercent(tooltipData)
 	end
 	return false
 end
-
-local function tooltipFoodStats(tooltipData)
-	local definitions = {
-		{ label = "Str", localized = STAT_STRENGTH, itemMod = ITEM_MOD_STRENGTH_SHORT, fallback = "strength" },
-		{ label = "Agi", localized = STAT_AGILITY, itemMod = ITEM_MOD_AGILITY_SHORT, fallback = "agility" },
-		{ label = "Int", localized = STAT_INTELLECT, itemMod = ITEM_MOD_INTELLECT_SHORT, fallback = "intellect" },
-		{ label = "Sta", localized = STAT_STAMINA, itemMod = ITEM_MOD_STAMINA_SHORT, fallback = "stamina" },
-		{ label = "Spi", localized = STAT_SPIRIT, itemMod = ITEM_MOD_SPIRIT_SHORT, fallback = "spirit" },
-		{ label = "AP", localized = STAT_ATTACK_POWER, itemMod = ITEM_MOD_ATTACK_POWER_SHORT, fallback = "attack power" },
-		{ label = "Spell", localized = STAT_SPELL_DAMAGE, itemMod = ITEM_MOD_SPELL_DAMAGE_DONE_SHORT, fallback = "spell damage" },
-		{ label = "Heal", localized = STAT_HEALING_POWER, itemMod = ITEM_MOD_HEALING_DONE_SHORT, fallback = "healing power" },
-		{ label = "Armor", localized = STAT_ARMOR, itemMod = ITEM_MOD_ARMOR_SHORT, fallback = "armor" },
-		{ label = "Crit", localized = STAT_CRITICAL_STRIKE, itemMod = ITEM_MOD_CRIT_RATING_SHORT,
-			fallback = "critical strike chance", aliases = { "crit chance" }, percent = true },
-		{ label = "Move", fallback = "movement speed", percent = true },
-		{ label = "Fishing", fallback = "fishing" },
-		{ label = "Herb", fallback = "herbalism" },
-	}
-	local normalizedLines = {}
-	for _, line in ipairs(tooltipData and tooltipData.lines or {}) do
-		table.insert(normalizedLines, normalizeTooltipText(tooltipLineText(line)))
-	end
-	local bonuses = {}
-	for _, definition in ipairs(definitions) do
-		local terms = {}
-		local function addTerm(candidate)
-			if type(candidate) == "string" then
-				local term = normalizeTooltipText(candidate):gsub("%%[ds]", "")
-				term = term:gsub("[%+%p]", " "):match("^%s*(.-)%s*$")
-				if term ~= "" then
-					table.insert(terms, term)
-				end
-			end
-		end
-		addTerm(definition.localized)
-		addTerm(definition.itemMod)
-		addTerm(definition.fallback)
-		for _, alias in ipairs(definition.aliases or {}) do
-			addTerm(alias)
-		end
-		local found = false
-		for _, text in ipairs(normalizedLines) do
-			for _, term in ipairs(terms) do
-				local first, last = text:find(term, 1, true)
-				if first then
-					local before = text:sub(1, first - 1)
-					local after = text:sub(last + 1)
-					local amount = before:match("([%+%-]?%d+%%?)%s*$")
-						or after:match("^%s*[:]?%s*([%+%-]?%d+%%?)")
-						or after:match("^[^%d]-by%s+([%+%-]?%d+%%?)")
-					local numericAmount = amount and amount:gsub("%%", "")
-					local value = numericAmount and tonumber(numericAmount)
-					if value and value ~= 0 then
-						local sign = value > 0 and "+" or ""
-						local percent = definition.percent or (amount and amount:find("%%", 1, true))
-						local suffix = percent and "%" or ""
-						table.insert(bonuses, string.format("%s%d%s %s", sign, value, suffix, definition.label))
-						found = true
-						break
-					end
-				end
-			end
-			if found then
-				break
-			end
-		end
-	end
-	return bonuses
-end
-
-local function foodItemType(itemID)
-	local getInfo = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
-	if not getInfo then
-		return nil
-	end
-	local _, _, _, _, _, classID, subclassID = getInfo(itemID)
-	if classID == nil or subclassID == nil then
-		return nil
-	end
-	return classID == 0 and subclassID == 5
-end
-
-local function hasQualifyingFood()
-	if cachedBagResult ~= nil then
-		return cachedBagResult
-	end
-	cachedFoodSupply = nil
-	cachedFoodScanComplete = false
-	if not C_Container or not C_Container.GetContainerNumSlots or not C_Container.GetContainerItemInfo then
-		return nil
-	end
-
-	local unresolvedTooltip = false
-	local bestBonusPercent = 0
-	local qualifyingFoods = {}
-	local bagCount = NUM_BAG_SLOTS or 0
-	for bagID = 0, bagCount do
-		local slotCount = C_Container.GetContainerNumSlots(bagID) or 0
-		for slot = 1, slotCount do
-			local itemInfo = C_Container.GetContainerItemInfo(bagID, slot)
-			local itemID = itemInfo and itemInfo.itemID
-			if itemID then
-				local isFood = foodItemType(itemID)
-				local bonusPercent = foodTooltipCache[itemID]
-				if isFood == nil then
-					unresolvedTooltip = true
-					bonusPercent = nil
-				elseif not isFood then
-					bonusPercent = false
-				elseif bonusPercent == nil or (type(bonusPercent) == "number" and foodStatsCache[itemID] == nil) then
-					local tooltipData = C_TooltipInfo and C_TooltipInfo.GetBagItem
-						and C_TooltipInfo.GetBagItem(bagID, slot)
-					if tooltipData and type(tooltipData.lines) == "table" and #tooltipData.lines > 1 then
-						bonusPercent = tooltipExperienceBonusPercent(tooltipData)
-						if type(bonusPercent) == "number" then
-							foodTooltipCache[itemID] = bonusPercent
-							foodStatsCache[itemID] = tooltipFoodStats(tooltipData)
-						elseif bonusPercent == false and hasItemUseDescription(tooltipData) then
-							foodTooltipCache[itemID] = false
-						elseif bonusPercent == false then
-							bonusPercent = nil
-							unresolvedTooltip = true
-						elseif bonusPercent == nil then
-							unresolvedTooltip = true
-						end
-					else
-						unresolvedTooltip = true
-					end
-				end
-				if type(bonusPercent) == "number" and bonusPercent > bestBonusPercent then
-					bestBonusPercent = bonusPercent
-				end
-				if type(bonusPercent) == "number" and bonusPercent > 0 then
-					local matchingFood
-					for _, food in ipairs(qualifyingFoods) do
-						if food.itemID == itemID then
-							matchingFood = food
-							break
-						end
-					end
-					local count = itemInfo.stackCount or itemInfo.count or 1
-					if type(count) ~= "number" or count < 1 then
-						count = 1
-					end
-					if matchingFood then
-						matchingFood.count = matchingFood.count + count
-					else
-						local itemName = itemInfo.itemName or (GetItemInfo and GetItemInfo(itemID))
-						table.insert(qualifyingFoods, {
-							itemID = itemID,
-							itemName = itemName or ("item " .. itemID),
-							bagID = bagID,
-							slot = slot,
-							bonusPercent = bonusPercent,
-							count = count,
-							stats = foodStatsCache[itemID] or {},
-						})
-					end
-				end
-			end
-		end
-	end
-	table.sort(qualifyingFoods, function(first, second)
-		if first.bonusPercent ~= second.bonusPercent then
-			return first.bonusPercent > second.bonusPercent
-		end
-		return first.itemName < second.itemName
-	end)
-	cachedQualifyingFoods = qualifyingFoods
-	cachedFoodScanComplete = not unresolvedTooltip
-	if unresolvedTooltip then
-		return bestBonusPercent > 0 and bestBonusPercent or nil
-	end
-	cachedBagResult = bestBonusPercent > 0 and bestBonusPercent or false
-	return cachedBagResult
-end
-
-local function invalidateBagScan(itemID)
-	cachedBagResult = nil
-	cachedQualifyingFoods = nil
-	cachedFoodSupply = nil
-	cachedFoodScanComplete = false
-	if itemID then
-		foodTooltipCache[itemID] = nil
-		foodStatsCache[itemID] = nil
-	end
-end
-
-function ns.GetAvailableFoods()
-	if cachedQualifyingFoods == nil then
-		cachedBagResult = nil
-		hasQualifyingFood()
-	end
-	return cachedQualifyingFoods or {}
-end
-
-local function traitValue(api, ...)
-	if type(api) ~= "function" then
-		return nil
-	end
-	local success, value = pcall(api, ...)
-	if success then
-		return value
-	end
-end
-
-local function gourmandRank()
-	if gourmandScanComplete then
-		return cachedGourmandRank
-	end
-	gourmandScanComplete = true
-	if not C_Traits then
-		return nil
-	end
-	local configs = {}
-	local seen = {}
-	local function addConfig(configID, priority)
-		if type(configID) ~= "number" then
-			return
-		end
-		if seen[configID] then
-			seen[configID].priority = math.max(seen[configID].priority, priority)
-		else
-			local config = { id = configID, priority = priority }
-			seen[configID] = config
-			table.insert(configs, config)
-		end
-	end
-	for name, configType in pairs(Enum and Enum.TraitConfigType or {}) do
-		local configIDs = traitValue(C_Traits.GetConfigsByType, configType)
-		if type(configIDs) == "table" then
-			local priority = tostring(name):lower():find("legacy", 1, true) and 2 or 1
-			for _, configID in ipairs(configIDs) do
-				addConfig(configID, priority)
-			end
-		end
-	end
-	addConfig(traitValue(C_ClassTalents and C_ClassTalents.GetActiveConfigID), 0)
-	table.sort(configs, function(first, second) return first.priority > second.priority end)
-	for _, config in ipairs(configs) do
-		local info = traitValue(C_Traits.GetConfigInfo, config.id)
-		for _, treeID in ipairs(type(info) == "table" and info.treeIDs or {}) do
-			local nodeIDs = traitValue(C_Traits.GetTreeNodes, treeID)
-			for _, nodeID in ipairs(type(nodeIDs) == "table" and nodeIDs or {}) do
-				local node = traitValue(C_Traits.GetNodeInfo, config.id, nodeID)
-				if type(node) == "table" then
-					local matches = nodeID == 1225499
-					for _, entryID in ipairs(node.entryIDs or {}) do
-						local entry = traitValue(C_Traits.GetEntryInfo, config.id, entryID)
-						local definitionID = type(entry) == "table" and entry.definitionID
-						local definition = definitionID and traitValue(C_Traits.GetDefinitionInfo, definitionID)
-						if entryID == 1225499 or definitionID == 1225499
-							or (type(definition) == "table" and definition.spellID == 1225499) then
-							matches = true
-						end
-					end
-					if matches then
-						local rank = node.ranksPurchased
-						if rank == nil and type(node.activeEntry) == "table" then rank = node.activeEntry.rank end
-						if rank == nil then rank = node.currentRank or node.activeRank end
-						if type(rank) == "number" and rank >= 0 and rank <= 3 and rank == math.floor(rank) then
-							cachedGourmandRank = rank
-							return rank
-						end
-					end
-				end
-			end
-		end
-	end
-end
-
-local function invalidateFoodDuration()
-	gourmandScanComplete = false
-	cachedGourmandRank = nil
-	cachedFoodSupply = nil
-end
-
-function ns.GetFoodSupply()
-	if cachedFoodSupply then
-		return cachedFoodSupply
-	end
-	local count = 0
-	local bestBonusPercent = 0
-	for _, food in ipairs(ns.GetAvailableFoods()) do
-		count = count + food.count
-		bestBonusPercent = math.max(bestBonusPercent, food.bonusPercent)
-	end
-	local rank = gourmandRank()
-	local duration = (15 + (rank or 0) * 5) * 60
-	cachedFoodSupply = {
-		count = count,
-		seconds = count * duration,
-		perServingSeconds = duration,
-		complete = cachedFoodScanComplete,
-		isFallback = rank == nil,
-		gourmandRank = rank,
-		bestBonusPercent = bestBonusPercent > 0 and bestBonusPercent or nil,
-	}
-	return cachedFoodSupply
-end
+ns.GetExperienceBonusPercent = tooltipExperienceBonusPercent
 
 local function formatDuration(seconds)
 	local totalMinutes = math.floor(math.max(0, seconds) / 60)
@@ -591,23 +290,7 @@ local function formatDuration(seconds)
 	end
 	return string.format("%dm", minutes)
 end
-
-function ns.GetFoodSupplyText()
-	local supply = ns.GetFoodSupply()
-	local template = supply.complete and ForeverSnackTrackL.foodSupply or ForeverSnackTrackL.foodSupplyPartial
-	if supply.count == 1 then
-		template = supply.complete and ForeverSnackTrackL.foodSupplySingle or ForeverSnackTrackL.foodSupplyPartialSingle
-	end
-	local message = string.format(template, supply.count, formatDuration(supply.seconds))
-	if not supply.complete and supply.count == 0 then
-		message = ForeverSnackTrackL.foodSupplyLoading
-	end
-	local rankDetail = supply.isFallback and ForeverSnackTrackL.foodSupplyFallback
-		or string.format(ForeverSnackTrackL.foodSupplyGourmand, supply.gourmandRank)
-	local durationDetail = supply.isFallback and ForeverSnackTrackL.foodSupplyFallbackDuration
-		or string.format(ForeverSnackTrackL.foodSupplyDuration, supply.perServingSeconds / 60)
-	return message, rankDetail, durationDetail
-end
+ns.FormatDuration = formatDuration
 
 function ns.GetLowFoodStatusText()
 	local threshold = ns.db and ns.db.lowFoodThreshold or 0
@@ -633,7 +316,7 @@ function ns.ResetLowStockReminder()
 end
 
 function ns.GetFoodBuffComparisonText()
-	local supply = cachedFoodSupply
+	local supply = ns.GetCachedFoodSupply()
 	local buff = cachedBuffStatus
 	if not supply or not supply.complete then
 		return ForeverSnackTrackL.foodBuffComparisonLoading
@@ -734,12 +417,40 @@ local function isPlayerFlying()
 	return IsFlying and IsFlying() or false
 end
 
+function ns.IsPlayerMoving()
+	if type(GetUnitSpeed) ~= "function" then
+		return false
+	end
+	local success, speed = pcall(GetUnitSpeed, "player")
+	if not success or type(speed) ~= "number" then
+		return false
+	end
+	if type(issecretvalue) == "function" then
+		local secretCheckSucceeded, isSecret = pcall(issecretvalue, speed)
+		if secretCheckSucceeded and isSecret then
+			return false
+		end
+	end
+	local comparisonSucceeded, moving = pcall(function()
+		return speed > 0
+	end)
+	return comparisonSucceeded and moving or false
+end
+
 local function updateFlightSuppression()
 	if not ns.db then
 		return
 	end
+	if ns.IsPlayerMoving() and ns.InterruptSleepingBagRest then
+		ns.InterruptSleepingBagRest()
+	end
 	if isPlayerFlying() then
 		flightSuppressed = true
+		if ns.InterruptSleepingBagRest then
+			ns.InterruptSleepingBagRest()
+		elseif ns.HideSleepingBagTimeline then
+			ns.HideSleepingBagTimeline()
+		end
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
 		end
@@ -790,7 +501,8 @@ local function warnAboutBuffExpiry(bonusPercent, expirationTime, spellID, now)
 		ForeverSnackTrackL.buffExpiryMessage, bonusPercent, math.ceil(remaining / 60)))
 end
 
-local function sendReminder(message, useCustomScreenMessage, lowFoodStatusText, chatMessage)
+local function sendReminder(message, useCustomScreenMessage, lowFoodStatusText, chatMessage,
+	showFoodActions, sleepingBagItemName)
 	local sent = false
 	if ns.db.chatAlerts and DEFAULT_CHAT_FRAME then
 		DEFAULT_CHAT_FRAME:AddMessage("|cff80d7ffForever SnackTrack:|r " .. (chatMessage or message))
@@ -801,7 +513,8 @@ local function sendReminder(message, useCustomScreenMessage, lowFoodStatusText, 
 		and not isPlayerFlying()
 		and not (ns.alertFrame and ns.alertFrame.isPreview and ns.alertFrame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
-		sent = ns.ShowScreenAlert(screenMessage, false, lowFoodStatusText) or sent
+		sent = ns.ShowScreenAlert(screenMessage, false, lowFoodStatusText,
+			showFoodActions, sleepingBagItemName) or sent
 	end
 	return sent
 end
@@ -811,7 +524,14 @@ function ns.Scan()
 		return
 	end
 	cachedBuffStatus = nil
+	local now = GetTime()
 	local playerLevel = UnitLevel and UnitLevel("player")
+	local sleepingBagEnabled = ns.db.trackSleepingBagBuff and ns.db.screenAlerts
+		and not (type(playerLevel) == "number" and playerLevel >= 60)
+	local sleepingBagStatus = ns.db.trackSleepingBagBuff and ns.GetSleepingBagStatus()
+	if ns.UpdateSleepingBagTimeline then
+		ns.UpdateSleepingBagTimeline(sleepingBagStatus, sleepingBagEnabled)
+	end
 	if type(playerLevel) == "number" and playerLevel >= 60 then
 		lastReminderTime = nil
 		reminderState = nil
@@ -844,20 +564,16 @@ function ns.Scan()
 		return
 	end
 
-	local now = GetTime()
 	if not tooltipCacheTime or now - tooltipCacheTime >= 60 then
-		foodTooltipCache = {}
-		foodStatsCache = {}
+		ns.ResetFoodCaches()
 		auraTooltipCache = {}
-		cachedBagResult = nil
-		cachedQualifyingFoods = nil
-		cachedFoodSupply = nil
-		cachedFoodScanComplete = false
 		tooltipCacheTime = now
 	end
 
-	local hasFood = hasQualifyingFood()
+	local hasFood = ns.ScanQualifyingFood()
 	local requiredBonusPercent = type(hasFood) == "number" and hasFood or nil
+	local sleepingBagReminder = ns.db.trackSleepingBagBuff
+		and ns.GetSleepingBagReminder(sleepingBagStatus, now)
 	local lowFoodThreshold = ns.db.lowFoodThreshold
 	local foodSupply = lowFoodThreshold > 0 and ns.GetFoodSupply() or nil
 	if lowFoodThreshold == 0 or (foodSupply and foodSupply.complete and foodSupply.count > lowFoodThreshold) then
@@ -878,11 +594,11 @@ function ns.Scan()
 	if ns.SetLowFoodStatusText then
 		ns.SetLowFoodStatusText(lowFoodStatusText)
 	end
-	if hasFood == nil then
+	if hasFood == nil and not sleepingBagReminder then
 		return
 	end
 	local lowStock = foodSupply and foodSupply.complete and foodSupply.count <= lowFoodThreshold
-	if lowStock and hasBuff == nil then
+	if lowStock and hasBuff == nil and not sleepingBagReminder then
 		return
 	end
 	local lowStockReminder = lowStock
@@ -894,7 +610,13 @@ function ns.Scan()
 	local message
 	local chatMessage
 	local useCustomScreenMessage = false
-	if hasFood then
+	if sleepingBagReminder then
+		state = "sleeping-bag:" .. sleepingBagReminder
+		message = sleepingBagReminder == "refresh"
+			and ForeverSnackTrackL.sleepingBagRefreshMessage or ForeverSnackTrackL.sleepingBagBuildMessage
+	elseif hasFood == nil then
+		return
+	elseif hasFood then
 		if hasBuff == nil then
 			return
 		elseif type(hasBuff) == "number" and hasBuff >= hasFood then
@@ -961,7 +683,8 @@ function ns.Scan()
 		and now - lastReminderTime >= ns.db.reminderMinutes * 60
 	if lowStockNoticeDue or not lastReminderTime
 		or (state ~= "low-food-stock" and ns.db.repeatReminders and intervalElapsed) then
-		if sendReminder(message, useCustomScreenMessage, lowFoodStatusText, chatMessage) then
+		if sendReminder(message, useCustomScreenMessage, lowFoodStatusText, chatMessage,
+			not sleepingBagReminder, sleepingBagStatus and sleepingBagStatus.itemName) then
 			lastReminderTime = now
 			if lowStockNoticeDue then
 				lowStockNotified = true
@@ -977,7 +700,8 @@ function ns.Scan()
 		and (ns.db.screenDuration == 0 or remaining > 0)
 		and not (frame and frame:IsShown()) then
 		local screenMessage = useCustomScreenMessage and ns.db.screenMessage ~= "" and ns.db.screenMessage or message
-		ns.ShowScreenAlert(screenMessage, false, lowFoodStatusText)
+		ns.ShowScreenAlert(screenMessage, false, lowFoodStatusText, not sleepingBagReminder,
+			sleepingBagStatus and sleepingBagStatus.itemName)
 		if remaining and ns.alertFrame then
 			ns.alertFrame.remaining = remaining
 		end
@@ -997,6 +721,7 @@ local function debugTooltipCandidates(tooltipData)
 	end
 	return candidates
 end
+ns.DebugTooltipCandidates = debugTooltipCandidates
 
 function ns.DebugStatus()
 	if not DEFAULT_CHAT_FRAME then
@@ -1030,76 +755,7 @@ function ns.DebugStatus()
 		debugPrint("Leave combat before running the diagnostic.")
 		return
 	end
-	if not C_Container or not C_Container.GetContainerNumSlots or not C_Container.GetContainerItemInfo
-		or not C_TooltipInfo or not C_TooltipInfo.GetBagItem then
-		debugPrint("Bag or tooltip API is unavailable.")
-		return
-	end
-
-	invalidateBagScan()
-	local scannedItems = 0
-	local unresolvedItems = 0
-	local recognizedFoods = 0
-	local bestFoodPercent = 0
-	local bagCount = NUM_BAG_SLOTS or 0
-	debugPrint("Scanning carried bags and helpful buffs...")
-	for bagID = 0, bagCount do
-		local slotCount = C_Container.GetContainerNumSlots(bagID) or 0
-		for slot = 1, slotCount do
-			local itemInfo = C_Container.GetContainerItemInfo(bagID, slot)
-			local itemID = itemInfo and itemInfo.itemID
-			if itemID and foodItemType(itemID) ~= false then
-				scannedItems = scannedItems + 1
-				local tooltipData = C_TooltipInfo.GetBagItem(bagID, slot)
-				if foodItemType(itemID) == nil or not tooltipData
-					or type(tooltipData.lines) ~= "table" or #tooltipData.lines <= 1 then
-					unresolvedItems = unresolvedItems + 1
-					debugPrint("Item " .. itemID .. ": tooltip data unavailable.")
-				else
-					local bonusPercent = tooltipExperienceBonusPercent(tooltipData)
-					if bonusPercent == false and not hasItemUseDescription(tooltipData) then
-						bonusPercent = nil
-					end
-					if bonusPercent == nil then
-						unresolvedItems = unresolvedItems + 1
-					end
-					if type(bonusPercent) == "number" or bonusPercent == false then
-						foodTooltipCache[itemID] = bonusPercent
-					else
-						foodTooltipCache[itemID] = nil
-					end
-					local itemName = itemInfo.itemName or (GetItemInfo and GetItemInfo(itemID)) or ("item " .. itemID)
-					if type(bonusPercent) == "number" then
-						recognizedFoods = recognizedFoods + 1
-						bestFoodPercent = math.max(bestFoodPercent, bonusPercent)
-						debugPrint(string.format("Food: %s (ID %d) -> %d%% kill XP", itemName, itemID, bonusPercent))
-					else
-						for _, candidate in ipairs(debugTooltipCandidates(tooltipData)) do
-							debugPrint(string.format("Item candidate %s (ID %d): %s", itemName, itemID, candidate))
-						end
-					end
-				end
-			end
-		end
-	end
-
-	if unresolvedItems == 0 then
-		cachedBagResult = bestFoodPercent > 0 and bestFoodPercent or false
-	else
-		cachedBagResult = nil
-	end
-	if unresolvedItems > 0 then
-		debugPrint(string.format("%d item tooltip(s) unavailable; known XP food can still trigger reminders.", unresolvedItems))
-	end
-	local supply = ns.GetFoodSupply()
-	local threshold = ns.db.lowFoodThreshold == 0 and "disabled" or tostring(ns.db.lowFoodThreshold)
-	debugPrint(string.format("Low-stock threshold: %s; qualifying food count: %d (%s).",
-		threshold, supply.count, supply.complete and "complete" or "partial"))
-	if recognizedFoods == 0 then
-		debugPrint(string.format("No XP food recognized in %d carried item(s).", scannedItems))
-	else
-		debugPrint(string.format("Recognized %d XP food item(s); best available bonus is %d%%.", recognizedFoods, bestFoodPercent))
-	end
+	ns.DebugFoodStatus()
 
 	if not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex or not C_TooltipInfo.GetUnitBuff then
 		debugPrint("Aura or unit-tooltip API is unavailable.")
@@ -1215,6 +871,7 @@ eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("PLAYER_LEVEL_UP")
 eventFrame:RegisterEvent("PLAYER_UPDATE_RESTING")
 eventFrame:RegisterEvent("PLAYER_MOUNT_DISPLAY_CHANGED")
+pcall(eventFrame.RegisterEvent, eventFrame, "PLAYER_STARTED_MOVING")
 eventFrame:RegisterEvent("PLAYER_STOPPED_MOVING")
 eventFrame:RegisterEvent("PLAYER_DEAD")
 eventFrame:RegisterEvent("PLAYER_ALIVE")
@@ -1222,7 +879,13 @@ eventFrame:RegisterEvent("PLAYER_UNGHOST")
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
+pcall(eventFrame.RegisterEvent, eventFrame, "BAG_UPDATE_COOLDOWN")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+if eventFrame.RegisterUnitEvent then
+	eventFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+else
+	eventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+end
 if C_Traits then
 	pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_CONFIG_UPDATED")
 	pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_CONFIG_LIST_UPDATED")
@@ -1233,7 +896,7 @@ else
 	eventFrame:RegisterEvent("UNIT_AURA")
 end
 
-eventFrame:SetScript("OnEvent", function(_, event, arg1)
+eventFrame:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
 	if event == "ADDON_LOADED" then
 		if arg1 ~= addonName then
 			return
@@ -1244,8 +907,8 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 			ns.InitializeOptions()
 		end
 	elseif event == "PLAYER_LOGIN" then
-		invalidateBagScan()
-		invalidateFoodDuration()
+		ns.InvalidateFoodBagScan()
+		ns.InvalidateFoodDuration()
 		if C_Timer and C_Timer.NewTicker then
 			scanTicker = C_Timer.NewTicker(60, ns.Scan)
 			flightTicker = C_Timer.NewTicker(0.25, updateFlightSuppression)
@@ -1267,26 +930,42 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 		end
 		ns.Scan()
 	elseif event == "BAG_UPDATE_DELAYED" then
-		invalidateBagScan()
+		ns.InvalidateFoodBagScan()
 		ns.Scan()
 		if ns.RefreshSelectedFood then ns.RefreshSelectedFood() end
+	elseif event == "BAG_UPDATE_COOLDOWN" then
+		ns.Scan()
 	elseif event == "PLAYER_ENTERING_WORLD" then
-		invalidateBagScan()
-		invalidateFoodDuration()
+		if ns.ResetSleepingBagTrackingState then ns.ResetSleepingBagTrackingState() end
+		ns.InvalidateFoodBagScan()
+		ns.InvalidateFoodDuration()
 		ns.Scan()
 	elseif event == "TRAIT_CONFIG_UPDATED" or event == "TRAIT_CONFIG_LIST_UPDATED" then
-		invalidateFoodDuration()
+		ns.InvalidateFoodDuration()
 	elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" or event == "PLAYER_STOPPED_MOVING" then
 		updateFlightSuppression()
+	elseif event == "PLAYER_STARTED_MOVING" then
+		if ns.InterruptSleepingBagRest then ns.InterruptSleepingBagRest() end
+		updateFlightSuppression()
+	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
+		if arg1 == "player" and arg3 == 429961 and ns.RecordSleepingBagPlacement then
+			ns.RecordSleepingBagPlacement()
+		end
 	elseif event == "PLAYER_LEVEL_UP" then
 		ns.Scan()
 	elseif event == "PLAYER_DEAD" then
+		if ns.HideSleepingBagTimeline then
+			ns.HideSleepingBagTimeline()
+		end
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
 		end
 	elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
 		ns.Scan()
 	elseif event == "PLAYER_REGEN_DISABLED" then
+		if ns.HideSleepingBagTimeline then
+			ns.HideSleepingBagTimeline()
+		end
 		if ns.HideScreenAlert then
 			ns.HideScreenAlert()
 		end
@@ -1299,7 +978,7 @@ eventFrame:SetScript("OnEvent", function(_, event, arg1)
 			scheduleAuraScan()
 		end
 	elseif event == "GET_ITEM_INFO_RECEIVED" then
-		invalidateBagScan(arg1)
+		ns.InvalidateFoodBagScan(arg1)
 		ns.Scan()
 		if ns.RefreshSelectedFood then ns.RefreshSelectedFood() end
 	end

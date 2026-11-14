@@ -30,6 +30,9 @@ local function setup(settings, accountSettings, legacySettings)
 		spellDescriptions = {},
 		auras = nil,
 		traitReads = 0,
+		position = { x = 10, y = 20, mapID = 1 },
+		speed = 0,
+		speedIsSecret = false,
 	}
 	local methods = {}
 	local function object()
@@ -59,6 +62,9 @@ local function setup(settings, accountSettings, legacySettings)
 	function methods:GetText() return rawget(self, "textValue") or "" end
 	function methods:GetStringHeight()
 		return math.max(20, math.ceil(#self:GetText() / 40) * 20)
+	end
+	function methods:GetWidth()
+		return self.size and self.size.width or 0
 	end
 	function methods:SetChecked(value) self.checked = value end
 	function methods:GetChecked() return self.checked end
@@ -92,7 +98,11 @@ local function setup(settings, accountSettings, legacySettings)
 	function CreateFrame(_, name, parent, template)
 		local frame = object()
 		frame.template = template
-		if name then _G[name .. "Text"] = object() else state.eventFrame = frame end
+		if name then
+			_G[name .. "Text"] = object()
+		elseif not parent and not state.eventFrame then
+			state.eventFrame = frame
+		end
 		return frame
 	end
 	UIParent = object()
@@ -139,10 +149,27 @@ local function setup(settings, accountSettings, legacySettings)
 	function GetLocale() return settings and settings.locale or "enUS" end
 	function IsResting() return state.resting end
 	function IsFlying() return state.flying end
+	function GetUnitSpeed(unit)
+		assert(unit == "player")
+		return state.speed
+	end
+	function issecretvalue(value)
+		return state.speedIsSecret and value == state.speed
+	end
+	function UnitPosition(unit)
+		assert(unit == "player")
+		local position = state.position
+		return position.x, position.y, 0, position.mapID
+	end
 	function UnitAffectingCombat() return state.combat end
 	function UnitIsDeadOrGhost(unit)
 		assert(unit == "player")
 		return state.dead
+	end
+	function IsIndoors() return state.indoors end
+	function UnitIsSitting(unit)
+		assert(unit == "player")
+		return state.sitting
 	end
 	function GetItemInfo(itemID) return state.itemNames[itemID] end
 	STAT_STRENGTH, STAT_AGILITY, STAT_INTELLECT = "Strength", "Agility", "Intellect"
@@ -238,11 +265,11 @@ local function setup(settings, accountSettings, legacySettings)
 	ForeverSnackTrackDB, ForeverExpFoodDB = accountSettings, legacySettings
 	local ns = {}
 	assert(loadfile(addonPath .. "Locale.lua"))()
-	for _, path in ipairs({ "ScreenAlert.lua", "Core.lua", "Options.lua" }) do
+	for _, path in ipairs({ "Core.lua", "Food.lua", "ScreenAlert.lua", "SleepingBag.lua", "Options.lua" }) do
 		assert(loadfile(addonPath .. path))("ForeverSnackTrack", ns)
 	end
-	function state:event(event, arg)
-		self.eventFrame.scripts.OnEvent(self.eventFrame, event, arg)
+	function state:event(event, ...)
+		self.eventFrame.scripts.OnEvent(self.eventFrame, event, ...)
 	end
 	function state:runTimers()
 		local pendingTimers = self.pendingTimers
@@ -655,6 +682,253 @@ ns.DebugStatus()
 local debugOutput = table.concat(state.messages, "\n")
 assert(debugOutput:find("Low-stock threshold: 1; qualifying food count: 1 (complete).", 1, true), debugOutput)
 
+ns, state = setup()
+state.items[1] = { bagID = 0, slot = 1, itemID = 211527, stackCount = 1 }
+state.itemNames[211527] = "Cozy Sleeping Bag"
+state.auras = {
+	{ name = "Well-Rested", spellId = 429959, applications = 1, duration = 7200, expirationTime = 7300 },
+}
+C_Item.GetItemCooldown = function(itemID)
+	assert(itemID == 211527)
+	return 100, 3600, 1, 1
+end
+SlashCmdList.FOREVERSNACKTRACK("debug sleepingbag")
+local sleepingBagDebugOutput = table.concat(state.messages, "\n")
+assert(sleepingBagDebugOutput:find("Bag: Cozy Sleeping Bag %(item 211527; bag 0, slot 1%)."),
+	sleepingBagDebugOutput)
+assert(sleepingBagDebugOutput:find("C_Item.GetItemCooldown: start=100 duration=3600 enabled=1 rate=1."),
+	sleepingBagDebugOutput)
+assert(sleepingBagDebugOutput:find(
+	"Well-Rested aura: Well-Rested (spell 429959), stacks=1, duration=7200, expires in 7200 sec.", 1, true),
+	sleepingBagDebugOutput)
+
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+state.itemNames[211527] = "Cozy Sleeping Bag"
+state.itemTypes[211527] = { 15, 0 }
+state.auras = {}
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+local sleepingBagStatus = ns.GetSleepingBagStatus()
+assert(sleepingBagStatus.complete and sleepingBagStatus.bagPresent and sleepingBagStatus.cooldownReady)
+assert(sleepingBagStatus.stacks == 0)
+assert(ns.GetSleepingBagReminder(sleepingBagStatus, state.now) == "build-stacks")
+C_Item.GetItemCooldown = function() return state.now, 3600, 1 end
+sleepingBagStatus = ns.GetSleepingBagStatus()
+assert(not sleepingBagStatus.cooldownReady and sleepingBagStatus.cooldownRemaining == 3600)
+assert(ns.GetSleepingBagReminder(sleepingBagStatus, state.now) == nil)
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+state.auras = {
+	{ name = "Well-Rested", spellId = 429959, applications = 2, duration = 7200, expirationTime = 7300 },
+}
+state.resting = true
+SlashCmdList.FOREVERSNACKTRACK("bag")
+ns.Scan()
+assert(state.chats == 2 and state.messages[2]:find("build Well%-Rested stacks"),
+	table.concat(state.messages, " | "))
+assert(ns.alertFrame:IsShown() and ns.alertFrame.eatButton:IsShown())
+assert(ns.alertFrame.eatButton:GetText() == "Unroll Bag")
+assert(ns.alertFrame.eatButton:GetAttribute("type1") == "macro")
+assert(ns.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Cozy Sleeping Bag")
+state:event("BAG_UPDATE_DELAYED")
+state:event("GET_ITEM_INFO_RECEIVED", 1)
+assert(ns.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Cozy Sleeping Bag")
+assert(ns.alertFrame.eatButton:GetText() == "Unroll Bag")
+assert(not ns.alertFrame.eatDropdownButton:IsShown())
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 2/3"))
+for milestone = 1, 3 do
+	local marker = ns.sleepingBagTimeline.milestones[milestone]
+	assert(marker.label.point[2] == marker.marker and marker.label.point[3] == "BOTTOM")
+end
+state.now = 120
+ns.sleepingBagTimeline.scripts.OnUpdate(ns.sleepingBagTimeline, 1)
+assert(ns.sleepingBagTimeline.label:GetText():find("Next stack 00:40"))
+state.resting = false
+ns.Scan()
+assert(not ns.sleepingBagTimeline or not ns.sleepingBagTimeline:IsShown())
+state.now = 200
+state.resting = true
+ns.Scan()
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Next stack 01:00"))
+state.auras[1].applications = 3
+state.auras[1].expirationTime = 7400
+state.now = 260
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 3/3  |  Refresh in 01:00"))
+sleepingBagStatus = ns.GetSleepingBagStatus()
+assert(ns.GetSleepingBagReminder(sleepingBagStatus, state.now) == nil)
+state.auras[1].expirationTime = state.now + 590
+sleepingBagStatus = ns.GetSleepingBagStatus()
+assert(ns.GetSleepingBagReminder(sleepingBagStatus, state.now) == "refresh")
+
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.empty = true
+state.resting = true
+state.auras = {}
+ns.Scan()
+assert(not ns.sleepingBagTimeline or not ns.sleepingBagTimeline:IsShown())
+SlashCmdList.FOREVERSNACKTRACK("bag")
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 0/3"))
+SlashCmdList.FOREVERSNACKTRACK("bag")
+assert(not ns.sleepingBagTimeline:IsShown())
+state.auras = {
+	{ name = "Well-Rested", spellId = 429959, applications = 1, duration = 7200, expirationTime = 7400 },
+}
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(not ns.sleepingBagTimeline:IsShown())
+SlashCmdList.FOREVERSNACKTRACK("bag")
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 1/3"))
+state.resting = false
+state.position = { x = 300, y = 300, mapID = 1 }
+state:event("PLAYER_STARTED_MOVING", "player")
+state.resting = true
+ns.Scan()
+assert(not ns.sleepingBagTimeline:IsShown())
+state.position = { x = 10, y = 20, mapID = 1 }
+ns.Scan()
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 1/3"))
+
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.empty = true
+state.resting = true
+state.auras = {}
+ns.Scan()
+state.auras = {
+	{ name = "Well-Rested", spellId = 429959, applications = 1, duration = 7200, expirationTime = 7400 },
+}
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(not ns.sleepingBagTimeline or not ns.sleepingBagTimeline:IsShown())
+
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+state.itemNames[211527] = "Cozy Sleeping Bag"
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+ns.Scan()
+state:event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-guid", 429961, 1, "Unroll Bag")
+state.resting = true
+state:event("PLAYER_UPDATE_RESTING")
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 0/3"))
+
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+state.itemTypes[211527] = { 15, 0 }
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+state.resting = false
+ns.Scan()
+C_Item.GetItemCooldown = function() return state.now, 3600, 1 end
+state.resting = false
+state:event("BAG_UPDATE_COOLDOWN")
+assert(not ns.sleepingBagTimeline or not ns.sleepingBagTimeline:IsShown())
+state:event("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-guid", 429961, 1, "Unroll Bag")
+state.resting = true
+state:event("PLAYER_UPDATE_RESTING")
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 0/3"))
+state.resting = false
+state.position = { x = 300, y = 300, mapID = 1 }
+state:event("PLAYER_STARTED_MOVING", "player")
+state.resting = true
+ns.Scan()
+assert(not ns.sleepingBagTimeline:IsShown())
+state.position = { x = 10, y = 20, mapID = 1 }
+ns.Scan()
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 0/3"))
+
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.empty = true
+C_Item.GetItemCooldown = function() return state.now, 3600, 1 end
+state.auras = {}
+state.resting = true
+ns.Scan()
+assert(not ns.sleepingBagTimeline or not ns.sleepingBagTimeline:IsShown())
+SlashCmdList.FOREVERSNACKTRACK("bag")
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 0/3"))
+state.auras = {
+	{ name = "Well-Rested", spellId = 429959, applications = 1, duration = 7200, expirationTime = 7400 },
+}
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 1/3"))
+sleepingBagStatus = ns.GetSleepingBagStatus()
+assert(sleepingBagStatus.complete and not sleepingBagStatus.bagPresent)
+assert(not sleepingBagStatus.cooldownReady and sleepingBagStatus.cooldownRemaining == 3600)
+assert(ns.GetSleepingBagReminder(sleepingBagStatus, state.now) == nil)
+assert(ns.sleepingBagTimeline:IsShown())
+state.resting = false
+state.position = { x = 300, y = 300, mapID = 1 }
+state:event("PLAYER_STARTED_MOVING", "player")
+assert(not ns.sleepingBagTimeline:IsShown())
+state.resting = true
+state:event("PLAYER_UPDATE_RESTING")
+assert(not ns.sleepingBagTimeline:IsShown())
+state.auras[1].applications = 1
+state:event("UNIT_AURA", "player")
+state:runTimers()
+assert(not ns.sleepingBagTimeline:IsShown())
+state.position = { x = 10, y = 20, mapID = 1 }
+ns.Scan()
+assert(ns.sleepingBagTimeline:IsShown())
+assert(ns.sleepingBagTimeline.label:GetText():find("Well%-Rested 1/3"))
+
+ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
+state.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+state.itemNames[211527] = "Cozy Sleeping Bag"
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+ns.Scan()
+ns.RecordSleepingBagPlacement()
+C_Item.GetItemCooldown = function() return state.now, 3600, 1 end
+state.resting = true
+state:event("PLAYER_UPDATE_RESTING")
+assert(ns.sleepingBagTimeline:IsShown())
+state.position = { x = 300, y = 300, mapID = 1 }
+state:event("PLAYER_ENTERING_WORLD")
+assert(not ns.sleepingBagTimeline:IsShown())
+assert(not ns.GetSleepingBagStatus().restSessionActive)
+state.combat = true
+ns.Scan()
+assert(not ns.sleepingBagTimeline:IsShown())
+state.combat = false
+state.flying = true
+ns.Scan()
+assert(not ns.sleepingBagTimeline:IsShown())
+state.flying = false
+state.dead = true
+ns.Scan()
+assert(not ns.sleepingBagTimeline:IsShown())
+
+ns, state = setup({ trackSleepingBagBuff = true, screenIconMode = true, remindWhileResting = true })
+state.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+state.itemTypes[211527] = { 15, 0 }
+state.itemNames[211527] = "Cozy Sleeping Bag"
+C_Item.GetItemCooldown = function() return 0, 0, 1 end
+state.auras = {}
+ns.Scan()
+assert(state.chats == 1 and ns.alertFrame.alertKind == "sleeping-bag")
+assert(ns.alertFrame.iconTexture.texture == "Interface\\Icons\\INV_Misc_Bag_10")
+assert(ns.alertFrame.eatButton:GetAttribute("type1") == "macro")
+assert(ns.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Cozy Sleeping Bag")
+state:event("BAG_UPDATE_DELAYED")
+state:event("GET_ITEM_INFO_RECEIVED", 1)
+assert(ns.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Cozy Sleeping Bag")
+ns.alertFrame.eatButton.scripts.PostClick(ns.alertFrame.eatButton, "RightButton")
+assert(#state.menuEntries == 0)
+ns.alertFrame.eatButton.scripts.OnEnter()
+assert(not table.concat(GameTooltip.lines, "\n"):find("Food supply:", 1, true))
+
 ns, state = setup({ remindWhenNoFood = true })
 ITEM_SPELL_TRIGGER_ONUSE = "Use: %s"
 state.foodTooltips[1] = { lines = {
@@ -769,7 +1043,17 @@ assert(ForeverSnackTrackL.noFoodOption == ForeverSnackTrackLocales.enUS.noFoodOp
 ns, state = setup()
 assert(ns.db.buffExpiryWarningMinutes == 5)
 assert(ns.db.lowFoodThreshold == 0)
-assert(ns.optionsPanel.supplyText.point[4] == 340 and ns.optionsPanel.supplyText.point[5] == -180)
+assert(ns.db.trackSleepingBagBuff == false)
+assert(ns.optionsPanel.supplyText.point[4] == 340 and ns.optionsPanel.supplyText.point[5] == -200)
+ns.optionsPanel.sleepingBagCheckbox:SetChecked(true)
+ns.optionsPanel.sleepingBagCheckbox.scripts.OnClick(ns.optionsPanel.sleepingBagCheckbox)
+assert(ns.db.trackSleepingBagBuff)
+ns.optionsPanel.sleepingBagCheckbox:SetChecked(false)
+ns.optionsPanel.sleepingBagCheckbox.scripts.OnClick(ns.optionsPanel.sleepingBagCheckbox)
+assert(not ns.db.trackSleepingBagBuff)
+
+ns, state = setup()
+assert(ns.db.buffExpiryWarningMinutes == 5)
 ns.optionsPanel.lowFoodThresholdSlider:SetValue(4)
 assert(ns.db.lowFoodThreshold == 4)
 assert(ns.optionsPanel.lowFoodThresholdSlider.scripts.OnMouseUp)
@@ -780,7 +1064,9 @@ assert(ns.optionsPanel.buffExpirySlider.scripts.OnMouseUp)
 state.buff = "Increases experience from kills by 5%"
 state.auraExpirationTime = 220
 ns.Scan()
-assert(state.chats == 1 and state.messages[1]:find("expires in about 2 min", 1, true))
+assert(state.chats == 1 and state.messages[1]:find("expires in about 2 min", 1, true),
+	table.concat(state.messages, " | ") .. " (" .. state.chats .. " chat message(s); "
+		.. state.auraReads .. " aura read(s); " .. state.buffReads .. " buff tooltip read(s))")
 assert(not ns.alertFrame)
 ns.Scan()
 assert(state.chats == 1)
@@ -965,6 +1251,12 @@ ns, state = setup({ repeatReminders = false })
 ns.Scan()
 local flightFrame = ns.alertFrame
 state:event("PLAYER_LOGIN")
+state.speed = 7
+state.speedIsSecret = true
+assert(not ns.IsPlayerMoving())
+state:runTicker(0.25)
+state.speedIsSecret = false
+assert(ns.IsPlayerMoving())
 state.flying = true
 state:runTicker(0.25)
 assert(not flightFrame:IsShown() and state.chats == 1)

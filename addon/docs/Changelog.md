@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.12 - 2026-11-14
+
+### Player-facing
+
+- Add opt-in Cozy Sleeping Bag reminders for building Well-Rested stacks and refreshing the full buff before it expires.
+- Show a separate 0/3-to-3/3 progress HUD while resting; use the bag's icon for Sleeping Bag reminders in icon mode. `/fst bag` manually starts/stops the timeline for a party-owned bag before the first aura stack appears.
+
+### Technical
+
+- Split food scanning and supply into `Food.lua`; isolate Sleeping Bag status, reminders, timeline, and diagnostics in `SleepingBag.lua`.
+- Use item 211527 and Well-Rested aura 429959. `/fst debug sleepingbag` reports cooldown, stack, expiry, resting state, location matching, and timeline gates.
+- Start the own-bag HUD from the verified unroll cast and nearby resting transition; for party bags, use stack growth or `/fst bag`. End the session on movement, and keep cooldown tracking after the placed bag disappears.
+- Resume the HUD at the current stack when resting again near the last detected bag position; distant resting areas alone cannot revive it.
+- Guard movement-speed checks against secret values returned during combat.
+
 ## 1.0.11 - 2026-11-11
 
 ### Player-facing
