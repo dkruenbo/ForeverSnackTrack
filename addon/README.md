@@ -16,6 +16,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 - Hides the on-screen reminder while dead or flying and restores it after resurrection or landing; chat reminders are unaffected.
 - Optionally reminds you when no qualifying food is in your bags.
 - Optionally reminds you when qualifying XP food falls to a per-character low-stock threshold; this one-shot warning is disabled by default and waits for a complete bag count.
+- Optionally tracks the Cozy Sleeping Bag's Well-Rested buff, with reminders to build/refresh its three stacks and a separate timeline while resting. This feature is experimental and needs broader in-game testing.
 - Provides a movable screen alert with custom text, duration, size, and color.
 - Scales the reminder from 25% to 150%, with size and display mode saved per character.
 - Offers a fixed-icon alternative to the popup: hover for reminder and selected-food details, left-click to eat, or right-click for food selection, snooze, and dismiss. Drag the icon to reposition it. Both modes use the same reminder visibility rules.
@@ -32,10 +33,10 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack-1.0.11.zip](ForeverSnackTrack-1.0.11.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.12.zip](ForeverSnackTrack-1.0.12.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat, resting, or flight, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
-4. Run `/fst debug` to print the low-stock threshold, recognized XP food and serving-count completeness, active XP buffs, and relevant tooltip candidates to chat.
+4. Run `/fst debug` to print the low-stock threshold, recognized XP food and serving-count completeness, active XP buffs, and relevant tooltip candidates to chat. Run `/fst debug sleepingbag` to inspect Sleeping Bag cooldown, aura, and session details.
 
 The addon targets interface `16001`. The game client must provide the Retail APIs used by the addon, including item classification through `C_Item.GetItemInfoInstant` or `GetItemInfoInstant`. Missing classification or loading tooltip data is treated as unresolved rather than as proof that no XP food exists.
 
@@ -58,6 +59,8 @@ Run `/fst debug` out of combat to inspect reminder settings, recognized food and
 MIT. See [LICENSE](../LICENSE).
 
 ## Tests
+
+Sleeping Bag tracking and its stack timeline are experimental and still need broader in-game testing.
 
 Run `lua addon/tests/addon.lua` from the repository root for mocked reminder-state, tooltip, item-classification, and scaled-position regression checks. Client API behavior and localized tooltips still require in-game testing.
 

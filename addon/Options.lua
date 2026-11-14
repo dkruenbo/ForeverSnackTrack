@@ -25,6 +25,7 @@ local function refreshOptions()
 	panel.screenCheckbox:SetChecked(ns.db.screenAlerts)
 	panel.iconCheckbox:SetChecked(ns.db.screenIconMode)
 	panel.noFoodCheckbox:SetChecked(ns.db.remindWhenNoFood)
+	panel.sleepingBagCheckbox:SetChecked(ns.db.trackSleepingBagBuff)
 	panel.restingCheckbox:SetChecked(ns.db.remindWhileResting)
 	panel.repeatCheckbox:SetChecked(ns.db.repeatReminders)
 	panel.lowFoodThresholdSlider:SetValue(ns.db.lowFoodThreshold)
@@ -80,6 +81,17 @@ function ns.InitializeOptions()
 	panel.iconCheckbox:SetScript("OnClick", function(self)
 		ns.db.screenIconMode = self:GetChecked()
 		ns.RefreshAlertMode()
+	end)
+	panel.sleepingBagCheckbox = makeCheckbox(panel, "ForeverSnackTrackSleepingBagCheckbox",
+		L.sleepingBagOption, -165)
+	panel.sleepingBagCheckbox:ClearAllPoints()
+	panel.sleepingBagCheckbox:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -165)
+	panel.sleepingBagCheckbox:SetScript("OnClick", function(self)
+		ns.db.trackSleepingBagBuff = self:GetChecked()
+		if ns.ResetSleepingBagTrackingState then
+			ns.ResetSleepingBagTrackingState()
+		end
+		ns.Scan()
 	end)
 
 	panel.chatCheckbox:SetScript("OnClick", function(self)
@@ -317,7 +329,7 @@ function ns.InitializeOptions()
 		ns.ResetScreenAlertPosition()
 	end)
 	panel.supplyText = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	panel.supplyText:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -180)
+	panel.supplyText:SetPoint("TOPLEFT", panel, "TOPLEFT", 340, -200)
 	panel.supplyText:SetWidth(300)
 	panel.supplyText:SetJustifyH("LEFT")
 	panel.supplyText:SetWordWrap(true)
@@ -343,6 +355,10 @@ function ns.InitializeOptions()
 		local command = (message or ""):lower():match("^%s*(.-)%s*$")
 		if command == "debug" then
 			ns.DebugStatus()
+		elseif command == "debug sleepingbag" then
+			ns.DebugSleepingBagStatus()
+		elseif command == "bag" then
+			ns.ToggleSleepingBagTimeline()
 		else
 			ns.OpenOptions()
 		end
