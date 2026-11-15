@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.13 - 2026-11-15
+
+### Player-facing
+
+- Recognize German victory-based and French enemy-elimination XP-food wording, plus English fallback descriptions on Italian pages.
+
+### Technical
+
+- Add localized tooltip parsing regression cases for all supported locale keys.
+
 ## 1.0.12 - 2026-11-14
 
 ### Player-facing
