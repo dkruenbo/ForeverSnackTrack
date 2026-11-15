@@ -1040,6 +1040,31 @@ ForeverSnackTrackLocales.deDE.noFoodOption = nil
 assert(germanChatOption == "Chatnachricht")
 assert(ForeverSnackTrackL.noFoodOption == ForeverSnackTrackLocales.enUS.noFoodOption)
 
+local xpTooltipCases = {
+	{ locale = "enUS", text = "Additionally, experience gained from kills is increased by 5%." },
+	{ locale = "enGB", text = "Additionally, experience gained from kills is increased by 5%." },
+	{ locale = "deDE", text = "Außerdem wird die durch Siege erhaltene Erfahrung um 5% erhöht." },
+	{ locale = "esES", text = "Además, la experiencia obtenida al matar enemigos aumenta un 5%." },
+	{ locale = "esMX", text = "Además, la experiencia obtenida al matar enemigos aumenta un 5%." },
+	{ locale = "frFR", text = "L’expérience que vous gagnez en éliminant des adversaires est également augmentée de 5 %." },
+	{ locale = "itIT", text = "Additionally, experience gained from kills is increased by 5%." },
+	{ locale = "ptBR", text = "Além disso, a experiência obtida com os abates é aumentada em 5%." },
+	{ locale = "ruRU", text = "Опыт, получаемый за убийства, увеличивается на 5%." },
+	{ locale = "koKR", text = "처치로 얻는 경험치가 5% 증가합니다." },
+	{ locale = "zhCN", text = "此外，击杀获得的经验提高5%。" },
+	{ locale = "zhTW", text = "此外，擊殺獲得的經驗提高5%。" },
+}
+for _, testCase in ipairs(xpTooltipCases) do
+	local localizedNs, localizedState = setup({ locale = testCase.locale })
+	localizedState.foodTooltips[1] = { lines = {
+		{ leftText = "Food" },
+		{ leftText = testCase.text },
+	} }
+	localizedNs.Scan()
+	assert(localizedState.chats == 1, testCase.locale)
+	assert(localizedNs.GetAvailableFoods()[1].bonusPercent == 5, testCase.locale)
+end
+
 ns, state = setup()
 assert(ns.db.buffExpiryWarningMinutes == 5)
 assert(ns.db.lowFoodThreshold == 0)
