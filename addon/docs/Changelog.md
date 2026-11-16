@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.14 - 2026-11-16
+
+### Player-facing
+
+- Prevent Sleeping Bag tracking from triggering restricted-aura errors during combat.
+
+### Technical
+
+- Query Well-Rested by spell ID instead of enumerating helpful auras, including in Sleeping Bag diagnostics.
+- Guard XP-buff aura reads against secret or inaccessible data; keep failed reads unresolved and retry on subsequent scans.
+
 ## 1.0.13 - 2026-11-15
 
 ### Player-facing

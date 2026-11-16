@@ -123,20 +123,38 @@ local function getSleepingBagCooldown(bagID, slot)
 end
 
 local function getWellRestedAura()
-	if not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then
+	local getAuraBySpellID = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID
+	if type(getAuraBySpellID) ~= "function" then
 		return nil, false
 	end
-	local index = 1
-	while true do
-		local aura = C_UnitAuras.GetAuraDataByIndex("player", index, "HELPFUL")
-		if not aura then
-			return nil, true
+	local success, aura = pcall(function()
+		local auraData = getAuraBySpellID(wellRestedSpellID)
+		if type(issecretvalue) == "function" and issecretvalue(auraData) then
+			error("Well-Rested aura data is restricted")
 		end
-		if aura.spellId == wellRestedSpellID then
-			return aura, true
+		if not auraData then
+			return nil
 		end
-		index = index + 1
+		if type(issecretvalue) == "function" then
+			for _, field in ipairs({ "spellId", "name", "applications", "charges", "duration", "expirationTime" }) do
+				if issecretvalue(auraData[field]) then
+					error("Well-Rested aura field is restricted")
+				end
+			end
+		end
+		return {
+			spellId = auraData.spellId,
+			name = auraData.name,
+			applications = auraData.applications,
+			charges = auraData.charges,
+			duration = auraData.duration,
+			expirationTime = auraData.expirationTime,
+		}
+	end)
+	if not success then
+		return nil, false
 	end
+	return aura, true
 end
 
 function ns.GetSleepingBagStatus()
@@ -441,29 +459,21 @@ function ns.DebugSleepingBagStatus()
 	if candidateCount == 0 then
 		ns.DebugPrint("No bag item matched sleep/rest/bag terms; include the item name and tooltip if the bag is present.")
 	end
-	if not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex then
-		ns.DebugPrint("Unit aura API is unavailable.")
+	if not C_UnitAuras or type(C_UnitAuras.GetPlayerAuraBySpellID) ~= "function" then
+		ns.DebugPrint("Player aura-by-spell API is unavailable.")
 		return
 	end
-	local auraIndex = 1
-	local auraCount = 0
-	while true do
-		local aura = C_UnitAuras.GetAuraDataByIndex("player", auraIndex, "HELPFUL")
-		if not aura then
-			break
-		end
-		auraCount = auraCount + 1
+	local aura, auraDataComplete = getWellRestedAura()
+	if not auraDataComplete then
+		ns.DebugPrint("Well-Rested aura data is unavailable or restricted.")
+	elseif aura then
 		local expirationText = type(aura.expirationTime) == "number" and aura.expirationTime > 0
 			and string.format("expires in %d sec", math.max(0, math.ceil(aura.expirationTime - GetTime())))
 			or "expiry unavailable"
-		if aura.spellId == wellRestedSpellID then
-			ns.DebugPrint(string.format("Well-Rested aura: %s (spell %s), stacks=%s, duration=%s, %s.",
-				aura.name or "unknown", aura.spellId, tostring(aura.applications or aura.charges or 0),
-				tostring(aura.duration), expirationText))
-		end
-		auraIndex = auraIndex + 1
-	end
-	if auraCount == 0 then
-		ns.DebugPrint("No helpful auras found.")
+		ns.DebugPrint(string.format("Well-Rested aura: %s (spell %s), stacks=%s, duration=%s, %s.",
+			aura.name or "unknown", aura.spellId, tostring(aura.applications or aura.charges or 0),
+			tostring(aura.duration), expirationText))
+	else
+		ns.DebugPrint("Well-Rested aura not found.")
 	end
 end

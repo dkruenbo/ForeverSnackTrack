@@ -343,6 +343,29 @@ function ns.GetFoodBuffComparisonText()
 		supply.bestBonusPercent, buff.bonusPercent)
 end
 
+local function readPlayerAura(index)
+	if C_Secrets and type(C_Secrets.ShouldUnitAuraIndexBeSecret) == "function" then
+		local success, restricted = pcall(C_Secrets.ShouldUnitAuraIndexBeSecret, "player", index, "HELPFUL")
+		if not success or restricted then
+			return nil, false
+		end
+	end
+	local success, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", index, "HELPFUL")
+	if not success then
+		return nil, false
+	end
+	if type(issecretvalue) == "function" then
+		if issecretvalue(aura) then
+			return nil, false
+		end
+		if aura and (issecretvalue(aura.spellId) or issecretvalue(aura.name)
+			or issecretvalue(aura.expirationTime)) then
+			return nil, false
+		end
+	end
+	return aura, true
+end
+
 local function hasExperienceBuff(requiredBonusPercent)
 	if not C_UnitAuras or not C_UnitAuras.GetAuraDataByIndex
 		or not C_TooltipInfo or not C_TooltipInfo.GetUnitBuff then
@@ -355,7 +378,14 @@ local function hasExperienceBuff(requiredBonusPercent)
 	local bestExpirationTime
 	local bestSpellID
 	while true do
-		local aura = C_UnitAuras.GetAuraDataByIndex("player", index, "HELPFUL")
+		local aura, accessible = readPlayerAura(index)
+		if not accessible then
+			local knownBonusPercent = bestBonusPercent > 0 and bestBonusPercent or nil
+			if requiredBonusPercent and bestBonusPercent >= requiredBonusPercent then
+				return knownBonusPercent, bestExpirationTime, bestSpellID, knownBonusPercent
+			end
+			return nil, bestExpirationTime, bestSpellID, knownBonusPercent
+		end
 		if not aura then
 			local knownBonusPercent = bestBonusPercent > 0 and bestBonusPercent or nil
 			if unresolvedTooltip and not (requiredBonusPercent and bestBonusPercent >= requiredBonusPercent) then
@@ -768,7 +798,11 @@ function ns.DebugStatus()
 	local unresolvedBuffs = 0
 	local bestBuffPercent = 0
 	while true do
-		local aura = C_UnitAuras.GetAuraDataByIndex("player", auraIndex, "HELPFUL")
+		local aura, accessible = readPlayerAura(auraIndex)
+		if not accessible then
+			debugPrint("Aura data is unavailable or restricted; retry outside combat.")
+			return
+		end
 		if not aura then
 			break
 		end
