@@ -33,7 +33,7 @@ A lightweight World of Warcraft Forever addon that helps you maintain the kill-e
 
 ## Install
 
-1. Download [ForeverSnackTrack-1.0.13.zip](ForeverSnackTrack-1.0.13.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
+1. Download [ForeverSnackTrack-1.0.14.zip](ForeverSnackTrack-1.0.14.zip) and extract its `ForeverSnackTrack` folder into `World of Warcraft\_retail_\Interface\AddOns\`.
 2. Enable **Forever SnackTrack** in the AddOns list and log in.
 3. Reminders work immediately with default preferences. To customize them, open the in-game options with `/snacktrack` or `/fst`. New installations repeat reminders every minute, warn in chat 5 minutes before an XP buff expires, and keep screen alerts visible until snoozed, dismissed, suppressed by combat, resting, or flight, hidden while dead, or no longer needed. Set the buff-warning lead time to 0 to disable it.
 4. Run `/fst debug` to print the low-stock threshold, recognized XP food and serving-count completeness, active XP buffs, and relevant tooltip candidates to chat. Run `/fst debug sleepingbag` to inspect Sleeping Bag cooldown, aura, and session details.

@@ -250,12 +250,26 @@ local function setup(settings, accountSettings, legacySettings)
 			return state.buffTooltips[index] or { lines = { { leftText = aura and aura.name or state.buff } } }
 		end,
 	}
-	C_UnitAuras = { GetAuraDataByIndex = function(_, index)
-		state.auraReads = state.auraReads + 1
-		if state.auras then return state.auras[index] end
-		if index == 1 and state.buff then
-			return { spellId = 1, name = "Well Fed", expirationTime = state.auraExpirationTime }
-		end
+	C_UnitAuras = {
+		GetAuraDataByIndex = function(_, index)
+			state.auraReads = state.auraReads + 1
+			if state.blockAuraIndex then error("aura index access is blocked") end
+			if state.auras then return state.auras[index] end
+			if index == 1 and state.buff then
+				return { spellId = 1, name = "Well Fed", expirationTime = state.auraExpirationTime }
+			end
+		end,
+		GetPlayerAuraBySpellID = function(spellID)
+			state.playerAuraReads = (state.playerAuraReads or 0) + 1
+			for _, aura in ipairs(state.auras or {}) do
+				if aura.spellId == spellID then
+					return aura
+				end
+			end
+		end,
+	}
+	C_Secrets = { ShouldUnitAuraIndexBeSecret = function()
+		return state.blockAuraIndex or false
 	end }
 	DEFAULT_CHAT_FRAME = { AddMessage = function(_, message)
 		state.chats = state.chats + 1
@@ -701,6 +715,49 @@ assert(sleepingBagDebugOutput:find("C_Item.GetItemCooldown: start=100 duration=3
 assert(sleepingBagDebugOutput:find(
 	"Well-Rested aura: Well-Rested (spell 429959), stacks=1, duration=7200, expires in 7200 sec.", 1, true),
 	sleepingBagDebugOutput)
+assert(state.auraReads == 0)
+
+do
+	local restrictedNs, restrictedState = setup({ trackSleepingBagBuff = true })
+	restrictedState.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+	restrictedState.itemTypes[211527] = { 15, 0 }
+	C_Item.GetItemCooldown = function() return 0, 0, 1 end
+	local getPlayerAura = C_UnitAuras.GetPlayerAuraBySpellID
+	C_UnitAuras.GetPlayerAuraBySpellID = nil
+	local status = restrictedNs.GetSleepingBagStatus()
+	assert(not status.complete and not status.auraComplete)
+	assert(restrictedNs.GetSleepingBagReminder(status, restrictedState.now) == nil)
+	C_UnitAuras.GetPlayerAuraBySpellID = function() error("aura access is restricted") end
+	status = restrictedNs.GetSleepingBagStatus()
+	assert(not status.complete and not status.auraComplete)
+	assert(restrictedNs.GetSleepingBagReminder(status, restrictedState.now) == nil)
+	C_UnitAuras.GetPlayerAuraBySpellID = getPlayerAura
+	restrictedState.auras = {
+		{ spellId = 429959, name = "Well-Rested", applications = 2, duration = 7200, expirationTime = 7300 },
+	}
+	local originalSecretCheck = issecretvalue
+	issecretvalue = function(value) return value == 7200 end
+	status = restrictedNs.GetSleepingBagStatus()
+	assert(not status.complete and not status.auraComplete)
+	issecretvalue = originalSecretCheck
+	restrictedState.combat = true
+	restrictedState.blockAuraIndex = true
+	restrictedNs.Scan()
+	assert(restrictedState.auraReads == 0 and restrictedState.chats == 0)
+	restrictedState.combat = false
+	restrictedState.auras = {}
+	restrictedState.items = { restrictedState.items[1] }
+	restrictedNs.Scan()
+	assert(restrictedState.auraReads == 0 and restrictedState.chats == 0)
+	C_Secrets = nil
+	restrictedNs.Scan()
+	assert(restrictedState.chats == 0)
+	restrictedState.blockAuraIndex = false
+	restrictedNs.Scan()
+	assert(restrictedState.chats == 1)
+	status = restrictedNs.GetSleepingBagStatus()
+	assert(status.complete and status.auraComplete and status.stacks == 0)
+end
 
 ns, state = setup({ trackSleepingBagBuff = true, remindWhileResting = true })
 state.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
@@ -708,9 +765,13 @@ state.itemNames[211527] = "Cozy Sleeping Bag"
 state.itemTypes[211527] = { 15, 0 }
 state.auras = {}
 C_Item.GetItemCooldown = function() return 0, 0, 1 end
+state.auraReads = 0
+state.blockAuraIndex = true
 local sleepingBagStatus = ns.GetSleepingBagStatus()
+state.blockAuraIndex = false
 assert(sleepingBagStatus.complete and sleepingBagStatus.bagPresent and sleepingBagStatus.cooldownReady)
 assert(sleepingBagStatus.stacks == 0)
+assert(state.auraReads == 0)
 assert(ns.GetSleepingBagReminder(sleepingBagStatus, state.now) == "build-stacks")
 C_Item.GetItemCooldown = function() return state.now, 3600, 1 end
 sleepingBagStatus = ns.GetSleepingBagStatus()
@@ -722,7 +783,10 @@ state.auras = {
 }
 state.resting = true
 SlashCmdList.FOREVERSNACKTRACK("bag")
-ns.Scan()
+state.blockAuraIndex = true
+local scanSucceeded, scanError = pcall(ns.Scan)
+state.blockAuraIndex = false
+assert(scanSucceeded, scanError)
 assert(state.chats == 2 and state.messages[2]:find("build Well%-Rested stacks"),
 	table.concat(state.messages, " | "))
 assert(ns.alertFrame:IsShown() and ns.alertFrame.eatButton:IsShown())
