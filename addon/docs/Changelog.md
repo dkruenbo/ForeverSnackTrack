@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.15 - 2026-11-19
+
+### Player-facing
+
+- Choose a one-time snooze duration for food and Sleeping Bag reminders without changing the configured default.
+
+### Technical
+
+- Offer the shared snooze durations from popup pickers and icon right-click menus; keep the Snooze button on the configured default.
+
 ## 1.0.14 - 2026-11-16
 
 ### Player-facing

@@ -6,6 +6,13 @@ local function setAlertPosition(frame)
 	frame:SetPoint("CENTER", UIParent, "CENTER", ns.db.alertOffsetX / scale, ns.db.alertOffsetY / scale)
 end
 
+local function hasSnoozeDropdownAPIs()
+	return type(ToggleDropDownMenu) == "function"
+		and type(UIDropDownMenu_Initialize) == "function"
+		and type(UIDropDownMenu_CreateInfo) == "function"
+		and type(UIDropDownMenu_AddButton) == "function"
+end
+
 local function updateAlertAppearance(frame, preservePosition)
 	local color = ns.db.screenColor
 	local iconMode = ns.db.screenIconMode
@@ -40,6 +47,7 @@ local function updateAlertAppearance(frame, preservePosition)
 		frame.eatButton:SetAllPoints(frame)
 		frame.eatButton:SetText("")
 		frame.snoozeButton:Hide()
+		frame.snoozeDropdownButton:Hide()
 		frame.dismissButton:Hide()
 		frame.eatDropdownButton:Hide()
 		frame.eatButton:Show()
@@ -49,7 +57,10 @@ local function updateAlertAppearance(frame, preservePosition)
 		frame.eatButton:SetText(frame.hasSleepingBagAction and ForeverSnackTrackL.sleepingBagUseButton
 			or ForeverSnackTrackL.eatButton)
 		frame.snoozeButton:SetShown(not frame.isPreview)
+		frame.snoozeDropdownButton:SetShown(not frame.isPreview and hasSnoozeDropdownAPIs())
 		frame.dismissButton:SetShown(not frame.isPreview)
+		frame.dismissButton:ClearAllPoints()
+		frame.dismissButton:SetPoint("LEFT", frame.snoozeDropdownButton, "RIGHT", 8, 0)
 		frame.eatButton:SetShown(not frame.isPreview and (frame.hasFood or frame.hasSleepingBagAction))
 		frame.eatDropdownButton:SetShown(not frame.isPreview and frame.hasFood)
 	end
@@ -203,10 +214,40 @@ local function createAlertFrame()
 	frame.snoozeButton:SetScript("OnClick", function()
 		ns.SnoozeReminders()
 	end)
+	frame.snoozeDropdownButton = CreateFrame("Button", "ForeverSnackTrackAlertSnoozeDropdownButton",
+		frame, "UIPanelButtonTemplate")
+	frame.snoozeDropdownButton:SetSize(24, 24)
+	frame.snoozeDropdownButton:SetPoint("LEFT", frame.snoozeButton, "RIGHT", 4, 0)
+	frame.snoozeDropdownButton:SetText("v")
+	frame.snoozeDropdownButton:SetScript("OnClick", function()
+		if hasSnoozeDropdownAPIs() then
+			ToggleDropDownMenu(1, nil, frame.snoozeDropdown,
+				"ForeverSnackTrackAlertSnoozeDropdownButton", 0, 0)
+		end
+	end)
+	frame.snoozeDropdown = CreateFrame("Frame", "ForeverSnackTrackAlertSnoozeDropdown", frame,
+		"UIDropDownMenuTemplate")
+	if UIDropDownMenu_Initialize and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
+		UIDropDownMenu_Initialize(frame.snoozeDropdown, function(_, level)
+			if level ~= 1 then
+				return
+			end
+			for _, duration in ipairs(ns.GetSnoozeDurations()) do
+				local snoozeDuration = duration
+				local info = UIDropDownMenu_CreateInfo()
+				info.text = string.format(ForeverSnackTrackL.snoozeButton, snoozeDuration)
+				info.notCheckable = true
+				info.func = function()
+					ns.SnoozeReminders(snoozeDuration)
+				end
+				UIDropDownMenu_AddButton(info, level)
+			end
+		end)
+	end
 
 	frame.dismissButton = CreateFrame("Button", "ForeverSnackTrackAlertDismissButton", frame, "UIPanelButtonTemplate")
 	frame.dismissButton:SetSize(100, 24)
-	frame.dismissButton:SetPoint("LEFT", frame.snoozeButton, "RIGHT", 8, 0)
+	frame.dismissButton:SetPoint("LEFT", frame.snoozeDropdownButton, "RIGHT", 8, 0)
 	frame.dismissButton:SetScript("OnClick", function()
 		ns.DismissReminder()
 	end)
@@ -238,11 +279,14 @@ local function createAlertFrame()
 	end)
 	frame.eatButton:SetScript("PostClick", function(_, mouseButton)
 		if frame.alertKind == "sleeping-bag" then
+			if mouseButton == "RightButton" and ns.db.screenIconMode and not frame.isPreview
+				and hasSnoozeDropdownAPIs() then
+				ToggleDropDownMenu(1, nil, frame.snoozeDropdown, "ForeverSnackTrackAlertEatButton", 0, 0)
+			end
 			return
 		end
 		if mouseButton == "RightButton" and ns.db.screenIconMode and not frame.isPreview
-			and ToggleDropDownMenu and UIDropDownMenu_Initialize
-			and UIDropDownMenu_CreateInfo and UIDropDownMenu_AddButton then
+			and hasSnoozeDropdownAPIs() then
 			ToggleDropDownMenu(1, nil, frame.foodDropdown, "ForeverSnackTrackAlertEatButton", 0, 0)
 		end
 	end)
@@ -282,11 +326,16 @@ local function createAlertFrame()
 				UIDropDownMenu_AddButton(info, level)
 			end
 			if ns.db.screenIconMode and not frame.isPreview then
-				local snoozeInfo = UIDropDownMenu_CreateInfo()
-				snoozeInfo.text = string.format(ForeverSnackTrackL.snoozeButton, ns.db.snoozeMinutes)
-				snoozeInfo.notCheckable = true
-				snoozeInfo.func = ns.SnoozeReminders
-				UIDropDownMenu_AddButton(snoozeInfo, level)
+				for _, duration in ipairs(ns.GetSnoozeDurations()) do
+					local snoozeDuration = duration
+					local snoozeInfo = UIDropDownMenu_CreateInfo()
+					snoozeInfo.text = string.format(ForeverSnackTrackL.snoozeButton, snoozeDuration)
+					snoozeInfo.notCheckable = true
+					snoozeInfo.func = function()
+						ns.SnoozeReminders(snoozeDuration)
+					end
+					UIDropDownMenu_AddButton(snoozeInfo, level)
+				end
 				local dismissInfo = UIDropDownMenu_CreateInfo()
 				dismissInfo.text = ForeverSnackTrackL.dismissButton
 				dismissInfo.notCheckable = true
