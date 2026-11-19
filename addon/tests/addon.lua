@@ -989,7 +989,9 @@ state:event("BAG_UPDATE_DELAYED")
 state:event("GET_ITEM_INFO_RECEIVED", 1)
 assert(ns.alertFrame.eatButton:GetAttribute("macrotext1") == "/use Cozy Sleeping Bag")
 ns.alertFrame.eatButton.scripts.PostClick(ns.alertFrame.eatButton, "RightButton")
-assert(#state.menuEntries == 0)
+assert(#state.menuEntries == 6)
+assert(state.menuEntries[1].text == "Snooze (1 min)")
+assert(state.menuEntries[5].text == "Snooze (30 min)")
 ns.alertFrame.eatButton.scripts.OnEnter()
 assert(not table.concat(GameTooltip.lines, "\n"):find("Food supply:", 1, true))
 
@@ -1267,7 +1269,9 @@ for _, iconMode in ipairs({ false, true }) do
 		frame.eatButton.scripts.OnLeave()
 		assert(not GameTooltip.shown)
 		frame.eatButton.scripts.PostClick(frame.eatButton, "RightButton")
-		assert(#state.menuEntries == 3 and state.dropdownAnchor == "ForeverSnackTrackAlertEatButton")
+		assert(#state.menuEntries == 8 and state.dropdownAnchor == "ForeverSnackTrackAlertEatButton")
+		assert(state.menuEntries[2].text == "Snooze (1 min)")
+		assert(state.menuEntries[6].text == "Snooze (30 min)")
 		state.menuEntries[2].func()
 		assert(not frame:IsShown())
 		state.now = 160
@@ -1309,6 +1313,39 @@ for _, iconMode in ipairs({ false, true }) do
 		frame.eatButton.scripts.PostClick(frame.eatButton, "RightButton")
 		assert(#state.menuEntries == 0)
 	end
+end
+
+for _, alertCase in ipairs({
+	{ alertKind = "food", settings = {} },
+	{ alertKind = "sleeping-bag", settings = { trackSleepingBagBuff = true, remindWhileResting = true } },
+}) do
+	local alertNs, alertState = setup(alertCase.settings)
+	if alertCase.alertKind == "sleeping-bag" then
+		alertState.items[2] = { bagID = 0, slot = 2, itemID = 211527, stackCount = 1 }
+		alertState.itemTypes[211527] = { 15, 0 }
+		alertState.auras = {}
+		C_Item.GetItemCooldown = function() return 0, 0, 1 end
+	end
+	alertNs.Scan()
+	local frame = alertNs.alertFrame
+	assert(frame.alertKind == alertCase.alertKind and frame.snoozeDropdownButton:IsShown())
+	frame.snoozeDropdown.initialize(frame.snoozeDropdown, 1)
+	assert(#alertState.menuEntries == 6)
+	local selectedLongSnooze = false
+	for _, entry in ipairs(alertState.menuEntries) do
+		if entry.text == "Snooze (30 min)" then
+			entry.func()
+			selectedLongSnooze = true
+			break
+		end
+	end
+	assert(selectedLongSnooze and alertNs.db.snoozeMinutes == 1)
+	alertState.now = alertState.now + 5 * 60
+	alertNs.Scan()
+	assert(alertState.chats == 1)
+	alertState.now = alertState.now + 26 * 60
+	alertNs.Scan()
+	assert(alertState.chats == 2 and alertNs.db.snoozeMinutes == 1)
 end
 
 ns, state = setup({ screenDuration = 5, repeatReminders = false })
@@ -1404,7 +1441,9 @@ state.empty = true
 ns.Scan()
 assert(ns.alertFrame.eatButton:IsShown() and ns.alertFrame.eatButton:GetAttribute("type1") == nil)
 ns.alertFrame.eatButton.scripts.PostClick(ns.alertFrame.eatButton, "RightButton")
-assert(#state.menuEntries == 2)
+assert(#state.menuEntries == 7)
+assert(state.menuEntries[1].text == "Snooze (1 min)")
+assert(state.menuEntries[5].text == "Snooze (30 min)")
 ns, state = setup()
 state.items = {
 	{ bagID = 0, slot = 1, itemID = 1, stackCount = 8 },

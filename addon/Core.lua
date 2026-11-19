@@ -856,12 +856,27 @@ function ns.DebugStatus()
 	end
 end
 
-function ns.SnoozeReminders()
+function ns.GetSnoozeDurations()
+	local durations = {}
+	for _, duration in ipairs(snoozeDurations) do
+		table.insert(durations, duration)
+	end
+	return durations
+end
+
+function ns.SnoozeReminders(durationOverride)
 	if not ns.db then
 		return
 	end
 
-	snoozeUntil = GetTime() + ns.db.snoozeMinutes * 60
+	local duration = ns.db.snoozeMinutes
+	for _, allowedDuration in ipairs(snoozeDurations) do
+		if durationOverride == allowedDuration then
+			duration = allowedDuration
+			break
+		end
+	end
+	snoozeUntil = GetTime() + duration * 60
 	lastReminderTime = nil
 	if ns.alertFrame then
 		ns.HideScreenAlert()
